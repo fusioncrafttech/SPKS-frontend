@@ -18,6 +18,9 @@ function RootLayoutNav() {
         <Stack.Screen name="(auth)" options={{ headerShown: false }} />
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="tnpsc" options={{ headerShown: false }} />
+        <Stack.Screen name="rrb" options={{ headerShown: false }} />
+        <Stack.Screen name="tnusrb" options={{ headerShown: false }} />
+        <Stack.Screen name="current-affairs" options={{ headerShown: false }} />
         <Stack.Screen name="profile" options={{ headerShown: false }} />
         <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
       </Stack>

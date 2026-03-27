@@ -1,9 +1,9 @@
-import { StyleSheet, View, ScrollView, StatusBar, Platform } from 'react-native';
 import { router } from 'expo-router';
+import { Platform, ScrollView, StatusBar, StyleSheet, View } from 'react-native';
 
-import { useTheme } from '@/contexts/theme-context';
 import { ThemedText } from '@/components/themed-text';
 import { CourseCard } from '@/components/ui/course-card';
+import { useTheme } from '@/contexts/theme-context';
 
 const STATUSBAR_HEIGHT = Platform.OS === 'ios' ? 44 : StatusBar.currentHeight || 24;
 
@@ -46,6 +46,12 @@ export default function HomeScreen() {
     // Navigate to respective course pages
     if (courseId === '1') {
       router.push('/tnpsc');
+    } else if (courseId === '2') {
+      router.push('/rrb');
+    } else if (courseId === '3') {
+      router.push('/tnusrb');
+    } else if (courseId === '4') {
+      router.push('/current-affairs');
     } else {
       console.log(`Selected course: ${courseTitle}`);
     }
