@@ -1,18 +1,85 @@
-import { StyleSheet, View, ScrollView, TouchableOpacity, StatusBar, Platform } from 'react-native';
+import { StyleSheet, View, ScrollView, TouchableOpacity, StatusBar, Platform, Alert } from 'react-native';
+import { useEffect, useState } from 'react';
 
 import { useTheme } from '@/contexts/theme-context';
 import { ThemedText } from '@/components/themed-text';
+import { api, asList } from '@/lib/api';
 
 const STATUSBAR_HEIGHT = Platform.OS === 'ios' ? 44 : StatusBar.currentHeight || 24;
+
+type Plan = {
+  id: string;
+  name: string;
+  price: string;
+  period: string;
+  features: string[];
+  color: string;
+  popular: boolean;
+};
+
+function formatPrice(value: unknown, currency = 'INR') {
+  const amount = Number(value);
+  if (Number.isNaN(amount)) return String(value || '₹0');
+  if (currency === 'INR' || currency === '₹') return `₹${amount}`;
+  return `${currency} ${amount}`;
+}
+
+function formatPeriod(duration: unknown) {
+  if (!duration) return '/month';
+  const text = String(duration);
+  if (text.includes('/')) return text;
+  return `/${text}`;
+}
+
+function parseFeatures(value: unknown): string[] {
+  if (Array.isArray(value)) return value.map(String);
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value);
+      if (Array.isArray(parsed)) return parsed.map(String);
+    } catch {
+      return value.split(',').map((item) => item.trim()).filter(Boolean);
+    }
+  }
+  return [];
+}
 
 export default function PriceScreen() {
   const { colors } = useTheme();
 
-  const pricingPlans = [
+  const fallbackPlans: Plan[] = [
     { id: '1', name: 'Basic', price: '₹199', period: '/month', features: ['Access to 2 courses', 'Daily quizzes', 'Basic support', 'Progress tracking'], color: colors.tint, popular: false },
     { id: '2', name: 'Pro', price: '₹499', period: '/month', features: ['Access to all courses', 'Unlimited quizzes', 'Priority support', 'Detailed analytics', 'Offline access'], color: colors.gradient2[0], popular: true },
     { id: '3', name: 'Premium', price: '₹999', period: '/month', features: ['Everything in Pro', 'One-on-one mentoring', 'Mock interviews', 'Certificate', 'Lifetime access'], color: colors.success, popular: false },
   ];
+  const [pricingPlans, setPricingPlans] = useState(fallbackPlans);
+
+  useEffect(() => {
+    api.get<Record<string, any>[]>('/api/plans')
+      .then((items) => {
+        const list = asList(items);
+        if (!list.length) return;
+        setPricingPlans(list.map((plan, index) => ({
+          id: String(plan.id),
+          name: plan.name || 'Plan',
+          price: formatPrice(plan.price, plan.currency),
+          period: formatPeriod(plan.duration),
+          features: parseFeatures(plan.features).length ? parseFeatures(plan.features) : ['Course access'],
+          color: index === 1 ? colors.gradient2[0] : index === 2 ? colors.success : colors.tint,
+          popular: Boolean(plan.popular || index === 1),
+        })));
+      })
+      .catch(() => undefined);
+  }, [colors]);
+
+  const handleGetStarted = async (plan: Plan) => {
+    try {
+      await api.post('/api/payments/create-order', { planId: plan.id });
+      Alert.alert('Order created', `Continue checkout for ${plan.name}.`);
+    } catch (error) {
+      Alert.alert('Payment', error instanceof Error ? error.message : 'Payment is not available yet.');
+    }
+  };
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -60,6 +127,7 @@ export default function PriceScreen() {
             <TouchableOpacity 
               style={[styles.button, { backgroundColor: plan.color }]}
               activeOpacity={0.8}
+              onPress={() => handleGetStarted(plan)}
             >
               <ThemedText style={styles.buttonText}>Get Started</ThemedText>
             </TouchableOpacity>

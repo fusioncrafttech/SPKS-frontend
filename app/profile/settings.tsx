@@ -1,23 +1,24 @@
-import { useState, useEffect } from 'react';
-import {
-  StyleSheet,
-  View,
-  ScrollView,
-  TouchableOpacity,
-  StatusBar,
-  Platform,
-  Switch,
-  Modal,
-  FlatList,
-  Alert,
-  KeyboardAvoidingView,
-} from 'react-native';
-import { router } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { router } from 'expo-router';
+import { useEffect, useState } from 'react';
+import {
+    Alert,
+    FlatList,
+    KeyboardAvoidingView,
+    Modal,
+    Platform,
+    ScrollView,
+    StatusBar,
+    StyleSheet,
+    Switch,
+    TouchableOpacity,
+    View,
+} from 'react-native';
 
-import { useTheme } from '@/contexts/theme-context';
 import { ThemedText } from '@/components/themed-text';
 import { TextInput } from '@/components/ui/text-input';
+import { useTheme } from '@/contexts/theme-context';
+import { api } from '@/lib/api';
 
 const STATUSBAR_HEIGHT = Platform.OS === 'ios' ? 44 : StatusBar.currentHeight || 24;
 
@@ -53,9 +54,8 @@ export default function SettingsScreen() {
 
   const loadSettings = async () => {
     try {
-      const settings = await AsyncStorage.getItem('appSettings');
-      if (settings) {
-        const data = JSON.parse(settings);
+      const data = await api.get<Record<string, any>>('/api/users/me/settings');
+      if (data) {
         setEmailNotifications(data.emailNotifications !== false);
         setAutoPlay(data.autoPlay || false);
         setDownloadOverWifi(data.downloadOverWifi !== false);
@@ -63,9 +63,18 @@ export default function SettingsScreen() {
           const lang = LANGUAGES.find(l => l.id === data.language);
           if (lang) setSelectedLanguage(lang);
         }
+        if (typeof data.darkMode === 'boolean') {
+          setTheme(data.darkMode ? 'dark' : 'light');
+        }
       }
-    } catch (error) {
-      console.log('Error loading settings:', error);
+    } catch {
+      const settings = await AsyncStorage.getItem('appSettings');
+      if (settings) {
+        const data = JSON.parse(settings);
+        setEmailNotifications(data.emailNotifications !== false);
+        setAutoPlay(data.autoPlay || false);
+        setDownloadOverWifi(data.downloadOverWifi !== false);
+      }
     }
   };
 
@@ -74,6 +83,7 @@ export default function SettingsScreen() {
       const settings = await AsyncStorage.getItem('appSettings');
       const data = settings ? JSON.parse(settings) : {};
       data[key] = value;
+      await api.patch('/api/users/me/settings', { [key]: value });
       await AsyncStorage.setItem('appSettings', JSON.stringify(data));
     } catch (error) {
       console.log('Error saving settings:', error);
@@ -82,6 +92,7 @@ export default function SettingsScreen() {
 
   const handleDarkModeToggle = (value: boolean) => {
     setTheme(value ? 'dark' : 'light');
+    saveSettings('darkMode', value);
   };
 
   const handleLanguageSelect = (language: typeof LANGUAGES[0]) => {
@@ -111,18 +122,11 @@ export default function SettingsScreen() {
       return;
     }
 
-    // TODO: Implement actual password change API call
-    Alert.alert('Success', 'Password changed successfully!', [
-      {
-        text: 'OK',
-        onPress: () => {
-          setShowPasswordModal(false);
-          setCurrentPassword('');
-          setNewPassword('');
-          setConfirmPassword('');
-        },
-      },
-    ]);
+    Alert.alert(
+      'Password change',
+      'Password updates are handled through email reset. Use Forgot password on the login screen.',
+      [{ text: 'OK', onPress: () => setShowPasswordModal(false) }],
+    );
   };
 
   const handleBack = () => {

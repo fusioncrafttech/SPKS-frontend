@@ -1,8 +1,12 @@
-import { StyleSheet, View, ScrollView, TouchableOpacity, StatusBar, Platform } from 'react-native';
 import { router } from 'expo-router';
+import { Platform, ScrollView, StatusBar, StyleSheet, TouchableOpacity, View } from 'react-native';
 
-import { useTheme } from '@/contexts/theme-context';
 import { ThemedText } from '@/components/themed-text';
+import { ApiResultsModal } from '@/components/ui/api-results-modal';
+import { useTheme } from '@/contexts/theme-context';
+import { useCatalogResults } from '@/hooks/use-catalog-results';
+import { api, asList } from '@/lib/api';
+import { CatalogItem } from '@/lib/catalog';
 
 const STATUSBAR_HEIGHT = Platform.OS === 'ios' ? 44 : StatusBar.currentHeight || 24;
 
@@ -14,10 +18,11 @@ const CATEGORIES = [
 
 export default function DayWiseScreen() {
   const { colors } = useTheme();
+  const results = useCatalogResults();
 
   const handleBack = () => router.back();
   const handleCategoryPress = (id: string, title: string) => {
-    console.log(`Current Affairs Day-wise - ${id}: ${title}`);
+    results.show(title, async () => asList<CatalogItem>(await api.get<CatalogItem[]>('/api/current-affairs', { category: id, limit: 50 })));
   };
 
   return (
@@ -57,6 +62,7 @@ export default function DayWiseScreen() {
           ))}
         </View>
       </ScrollView>
+      <ApiResultsModal visible={results.visible} title={results.title} loading={results.loading} items={results.items} emptyMessage={results.emptyMessage} onClose={results.close} />
     </View>
   );
 }

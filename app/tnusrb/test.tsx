@@ -1,8 +1,11 @@
-import { StyleSheet, View, ScrollView, TouchableOpacity, StatusBar, Platform } from 'react-native';
 import { router } from 'expo-router';
+import { Platform, ScrollView, StatusBar, StyleSheet, TouchableOpacity, View } from 'react-native';
 
-import { useTheme } from '@/contexts/theme-context';
 import { ThemedText } from '@/components/themed-text';
+import { ApiResultsModal } from '@/components/ui/api-results-modal';
+import { useTheme } from '@/contexts/theme-context';
+import { useCatalogResults } from '@/hooks/use-catalog-results';
+import { loadCourseItems } from '@/lib/catalog';
 
 const STATUSBAR_HEIGHT = Platform.OS === 'ios' ? 44 : StatusBar.currentHeight || 24;
 
@@ -18,10 +21,11 @@ const PC_TESTS = [
 
 export default function TestScreen() {
   const { colors } = useTheme();
+  const results = useCatalogResults();
 
   const handleBack = () => router.back();
   const handleTestPress = (id: string, title: string) => {
-    console.log(`TNUSRB Test - ${id}: ${title}`);
+    results.show(title, () => loadCourseItems('tnusrb', 'tests', { search: title }));
   };
 
   return (
@@ -87,6 +91,7 @@ export default function TestScreen() {
           ))}
         </View>
       </ScrollView>
+      <ApiResultsModal visible={results.visible} title={results.title} loading={results.loading} items={results.items} emptyMessage={results.emptyMessage} onClose={results.close} />
     </View>
   );
 }

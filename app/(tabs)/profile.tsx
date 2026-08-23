@@ -1,10 +1,12 @@
-import { useState, useCallback } from 'react';
-import { StyleSheet, View, ScrollView, TouchableOpacity, StatusBar, Platform, Alert, Image } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useCallback, useEffect, useState } from 'react';
+import { Alert, Image, Platform, ScrollView, StatusBar, StyleSheet, TouchableOpacity, View } from 'react-native';
 
-import { useTheme } from '@/contexts/theme-context';
 import { ThemedText } from '@/components/themed-text';
+import { useAuth } from '@/contexts/auth-context';
+import { useTheme } from '@/contexts/theme-context';
+import { api } from '@/lib/api';
+import { mapProfile } from '@/lib/auth';
 
 const STATUSBAR_HEIGHT = Platform.OS === 'ios' ? 44 : StatusBar.currentHeight || 24;
 
@@ -26,29 +28,59 @@ interface ProfileData {
 
 export default function ProfileScreen() {
   const { colors } = useTheme();
+  const { user, logout, refreshUser } = useAuth();
+  const mapped = mapProfile(user);
   const [profile, setProfile] = useState<ProfileData>({
-    firstName: 'Android',
-    lastName: 'User',
-    email: 'android@example.com',
-    phone: '9876543210',
-    profileImage: null,
+    firstName: mapped?.firstName || '',
+    lastName: mapped?.lastName || '',
+    email: mapped?.email || '',
+    phone: mapped?.phone || '',
+    profileImage: mapped?.profileImage || null,
   });
+  const [stats, setStats] = useState({ testsCompleted: 0, questionsAttempted: 0, averageScore: 0 });
 
-  // Reload profile data when screen comes into focus
   useFocusEffect(
     useCallback(() => {
       loadProfile();
-    }, [])
+    }, [user?.id])
   );
+
+  useEffect(() => {
+    api.get<{ testsCompleted?: number; questionsAttempted?: number; averageScore?: number }>('/api/users/me/stats')
+      .then((data) => {
+        if (!data) return;
+        setStats({
+          testsCompleted: data.testsCompleted || 0,
+          questionsAttempted: data.questionsAttempted || 0,
+          averageScore: Math.round(data.averageScore || 0),
+        });
+      })
+      .catch(() => undefined);
+  }, [user?.id]);
 
   const loadProfile = async () => {
     try {
-      const profileData = await AsyncStorage.getItem('userProfile');
-      if (profileData) {
-        setProfile(JSON.parse(profileData));
+      const remoteProfile = await refreshUser();
+      const next = mapProfile(remoteProfile);
+      if (next) {
+        setProfile({
+          firstName: next.firstName,
+          lastName: next.lastName,
+          email: next.email,
+          phone: next.phone || '',
+          profileImage: next.profileImage,
+        });
       }
-    } catch (error) {
-      console.log('Error loading profile:', error);
+    } catch {
+      if (mapped) {
+        setProfile({
+          firstName: mapped.firstName,
+          lastName: mapped.lastName,
+          email: mapped.email,
+          phone: mapped.phone || '',
+          profileImage: mapped.profileImage,
+        });
+      }
     }
   };
 
@@ -67,8 +99,7 @@ export default function ProfileScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
-              // Clear user data if needed
-              // await AsyncStorage.clear();
+              await logout();
               router.replace('/(auth)/login');
             } catch (error) {
               console.log('Error logging out:', error);
@@ -79,8 +110,8 @@ export default function ProfileScreen() {
     );
   };
 
-  const fullName = `${profile.firstName} ${profile.lastName}`;
-  const initials = profile.firstName.charAt(0).toUpperCase();
+  const fullName = `${profile.firstName} ${profile.lastName}`.trim() || 'Student';
+  const initials = (profile.firstName || profile.email || 'S').charAt(0).toUpperCase();
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -117,15 +148,15 @@ export default function ProfileScreen() {
         {/* Stats */}
         <View style={[styles.statsContainer, { backgroundColor: colors.card }]}>
           <View style={styles.statBox}>
-            <ThemedText style={[styles.statValue, { color: colors.tint }]}>12</ThemedText>
-            <ThemedText style={[styles.statLabel, { color: colors.textSecondary }]}>Courses</ThemedText>
+            <ThemedText style={[styles.statValue, { color: colors.tint }]}>{stats.testsCompleted}</ThemedText>
+            <ThemedText style={[styles.statLabel, { color: colors.textSecondary }]}>Tests</ThemedText>
           </View>
           <View style={styles.statBox}>
-            <ThemedText style={[styles.statValue, { color: colors.tint }]}>156</ThemedText>
-            <ThemedText style={[styles.statLabel, { color: colors.textSecondary }]}>Quizzes</ThemedText>
+            <ThemedText style={[styles.statValue, { color: colors.tint }]}>{stats.questionsAttempted}</ThemedText>
+            <ThemedText style={[styles.statLabel, { color: colors.textSecondary }]}>Questions</ThemedText>
           </View>
           <View style={styles.statBox}>
-            <ThemedText style={[styles.statValue, { color: colors.tint }]}>89%</ThemedText>
+            <ThemedText style={[styles.statValue, { color: colors.tint }]}>{stats.averageScore}%</ThemedText>
             <ThemedText style={[styles.statLabel, { color: colors.textSecondary }]}>Score</ThemedText>
           </View>
         </View>

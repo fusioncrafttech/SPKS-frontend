@@ -1,33 +1,39 @@
+import { Link, router } from 'expo-router';
 import { useState } from 'react';
 import {
-  StyleSheet,
-  View,
-  TouchableOpacity,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  Alert,
-  Keyboard,
-  TouchableWithoutFeedback,
+    Alert,
+    Keyboard,
+    KeyboardAvoidingView,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    TouchableOpacity,
+    TouchableWithoutFeedback,
+    View,
 } from 'react-native';
-import { Link, router } from 'expo-router';
 
-import { useTheme } from '@/contexts/theme-context';
 import { ThemedText } from '@/components/themed-text';
 import { TextInput } from '@/components/ui/text-input';
+import { useAuth } from '@/contexts/auth-context';
+import { useTheme } from '@/contexts/theme-context';
 
 interface FormErrors {
   firstName?: string;
   lastName?: string;
+  email?: string;
   mobileNumber?: string;
   password?: string;
   confirmPassword?: string;
 }
 
+const PASSWORD_RULE = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{6,}$/;
+
 export default function RegisterScreen() {
   const { colors } = useTheme();
+  const { register } = useAuth();
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
+  const [email, setEmail] = useState('');
   const [mobileNumber, setMobileNumber] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -38,10 +44,13 @@ export default function RegisterScreen() {
     const newErrors: FormErrors = {};
     if (!firstName.trim()) newErrors.firstName = 'First name is required';
     if (!lastName.trim()) newErrors.lastName = 'Last name is required';
-    if (!mobileNumber.trim()) newErrors.mobileNumber = 'Mobile number is required';
-    else if (!/^\d{10}$/.test(mobileNumber.replace(/\D/g, ''))) newErrors.mobileNumber = 'Please enter a valid 10-digit mobile number';
+    if (!email.trim()) newErrors.email = 'Email is required';
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) newErrors.email = 'Please enter a valid email address';
+    if (mobileNumber.trim() && !/^\d{10}$/.test(mobileNumber.replace(/\D/g, ''))) {
+      newErrors.mobileNumber = 'Please enter a valid 10-digit mobile number';
+    }
     if (!password) newErrors.password = 'Password is required';
-    else if (password.length < 6) newErrors.password = 'Password must be at least 6 characters';
+    else if (!PASSWORD_RULE.test(password)) newErrors.password = 'Use 6+ characters with upper, lower, and a number';
     if (!confirmPassword) newErrors.confirmPassword = 'Please confirm your password';
     else if (password !== confirmPassword) newErrors.confirmPassword = 'Passwords do not match';
     setErrors(newErrors);
@@ -52,10 +61,16 @@ export default function RegisterScreen() {
     if (!validateForm()) return;
     setIsLoading(true);
     try {
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-      Alert.alert('Success', 'Registration successful! Please login.', [{ text: 'OK', onPress: () => router.replace('/(auth)/login') }]);
-    } catch {
-      Alert.alert('Error', 'Registration failed. Please try again.');
+      await register({
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
+        email: email.trim().toLowerCase(),
+        phone: mobileNumber.replace(/\D/g, '') || undefined,
+        password,
+      });
+      router.replace('/(tabs)');
+    } catch (error) {
+      Alert.alert('Error', error instanceof Error ? error.message : 'Registration failed. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -80,6 +95,7 @@ export default function RegisterScreen() {
                   <TextInput label="Last Name" placeholder="Last name" value={lastName} onChangeText={setLastName} error={errors.lastName} autoCapitalize="words" autoCorrect={false} />
                 </View>
               </View>
+              <TextInput label="Email" placeholder="Enter your email" value={email} onChangeText={setEmail} error={errors.email} keyboardType="email-address" autoCapitalize="none" autoCorrect={false} />
               <TextInput label="Mobile Number" placeholder="Enter your mobile number" value={mobileNumber} onChangeText={setMobileNumber} error={errors.mobileNumber} keyboardType="phone-pad" maxLength={10} />
               <TextInput label="Password" placeholder="Enter your password" value={password} onChangeText={setPassword} error={errors.password} secureTextEntry autoCapitalize="none" autoCorrect={false} />
               <TextInput label="Confirm Password" placeholder="Confirm your password" value={confirmPassword} onChangeText={setConfirmPassword} error={errors.confirmPassword} secureTextEntry autoCapitalize="none" autoCorrect={false} />

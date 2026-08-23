@@ -1,9 +1,13 @@
 import { router } from 'expo-router';
+import { useEffect, useState } from 'react';
 import { Platform, ScrollView, StatusBar, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { CourseCard } from '@/components/ui/course-card';
+import { useAuth } from '@/contexts/auth-context';
 import { useTheme } from '@/contexts/theme-context';
+import { api } from '@/lib/api';
+import { courseRoute, listCourses } from '@/lib/catalog';
 
 const STATUSBAR_HEIGHT = Platform.OS === 'ios' ? 44 : StatusBar.currentHeight || 24;
 
@@ -32,29 +36,58 @@ const CurrentAffairsIcon = () => (
   </View>
 );
 
+const courseIcon = (title: string) => {
+  const key = title.toLowerCase();
+  if (key.includes('rrb')) return <RRBIcon />;
+  if (key.includes('tnusrb')) return <TNUSRBIcon />;
+  if (key.includes('current')) return <CurrentAffairsIcon />;
+  return <TNPSCIcon />;
+};
+
 export default function HomeScreen() {
   const { colors } = useTheme();
+  const { user } = useAuth();
 
-  const courses = [
-    { id: '1', title: 'TNPSC', subtitle: 'Tamil Nadu Public Service', icon: <TNPSCIcon /> },
-    { id: '2', title: 'RRB', subtitle: 'Transport Corporation', icon: <RRBIcon /> },
-    { id: '3', title: 'TNUSRB', subtitle: 'Police Recruitment', icon: <TNUSRBIcon /> },
-    { id: '4', title: 'Current Affairs', subtitle: 'Daily Updates & News', icon: <CurrentAffairsIcon /> },
+  const fallbackCourses = [
+    { id: '1', title: 'TNPSC', subtitle: 'Tamil Nadu Public Service', icon: <TNPSCIcon />, route: '/tnpsc' as const },
+    { id: '2', title: 'RRB', subtitle: 'Transport Corporation', icon: <RRBIcon />, route: '/rrb' as const },
+    { id: '3', title: 'TNUSRB', subtitle: 'Police Recruitment', icon: <TNUSRBIcon />, route: '/tnusrb' as const },
+    { id: '4', title: 'Current Affairs', subtitle: 'Daily Updates & News', icon: <CurrentAffairsIcon />, route: '/current-affairs' as const },
   ];
+  const [courses, setCourses] = useState(fallbackCourses);
+  const [stats, setStats] = useState({ dailyStreak: 0, testsCompleted: 0, averageScore: 0 });
 
-  const handleCoursePress = (courseId: string, courseTitle: string) => {
-    // Navigate to respective course pages
-    if (courseId === '1') {
-      router.push('/tnpsc');
-    } else if (courseId === '2') {
-      router.push('/rrb');
-    } else if (courseId === '3') {
-      router.push('/tnusrb');
-    } else if (courseId === '4') {
-      router.push('/current-affairs');
-    } else {
-      console.log(`Selected course: ${courseTitle}`);
-    }
+  useEffect(() => {
+    listCourses()
+      .then((items) => {
+        if (!items.length) return;
+        setCourses(items.map((item) => {
+          const title = item.name || item.title || 'Course';
+          return {
+            id: item.id,
+            title,
+            subtitle: item.description || item.subtitle || '',
+            icon: courseIcon(title),
+            route: courseRoute(item) || '/tnpsc',
+          };
+        }));
+      })
+      .catch(() => undefined);
+
+    api.get<{ dailyStreak?: number; testsCompleted?: number; averageScore?: number }>('/api/users/me/stats')
+      .then((data) => {
+        if (!data) return;
+        setStats({
+          dailyStreak: data.dailyStreak || 0,
+          testsCompleted: data.testsCompleted || 0,
+          averageScore: Math.round(data.averageScore || 0),
+        });
+      })
+      .catch(() => undefined);
+  }, [user?.id]);
+
+  const handleCoursePress = (route: string) => {
+    router.push(route as any);
   };
 
   return (
@@ -72,17 +105,17 @@ export default function HomeScreen() {
         {/* Stats Card */}
         <View style={[styles.statsCard, { backgroundColor: colors.card }]}>
           <View style={styles.statItem}>
-            <ThemedText style={[styles.statNumber, { color: colors.tint }]}>5</ThemedText>
+            <ThemedText style={[styles.statNumber, { color: colors.tint }]}>{stats.dailyStreak}</ThemedText>
             <ThemedText style={[styles.statLabel, { color: colors.textSecondary }]}>Daily Streak</ThemedText>
           </View>
           <View style={[styles.statDivider, { backgroundColor: colors.border }]} />
           <View style={styles.statItem}>
-            <ThemedText style={[styles.statNumber, { color: colors.tint }]}>12</ThemedText>
-            <ThemedText style={[styles.statLabel, { color: colors.textSecondary }]}>Courses Done</ThemedText>
+            <ThemedText style={[styles.statNumber, { color: colors.tint }]}>{stats.testsCompleted}</ThemedText>
+            <ThemedText style={[styles.statLabel, { color: colors.textSecondary }]}>Tests Done</ThemedText>
           </View>
           <View style={[styles.statDivider, { backgroundColor: colors.border }]} />
           <View style={styles.statItem}>
-            <ThemedText style={[styles.statNumber, { color: colors.tint }]}>89%</ThemedText>
+            <ThemedText style={[styles.statNumber, { color: colors.tint }]}>{stats.averageScore}%</ThemedText>
             <ThemedText style={[styles.statLabel, { color: colors.textSecondary }]}>Accuracy</ThemedText>
           </View>
         </View>
@@ -101,7 +134,7 @@ export default function HomeScreen() {
               title={course.title}
               subtitle={course.subtitle}
               icon={course.icon}
-              onPress={() => handleCoursePress(course.id, course.title)}
+              onPress={() => handleCoursePress(course.route)}
             />
           ))}
         </View>

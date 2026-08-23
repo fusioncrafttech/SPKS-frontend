@@ -1,8 +1,9 @@
-import { Tabs } from 'expo-router';
+import { Redirect, Tabs } from 'expo-router';
 import React from 'react';
 import { StyleSheet, View, Text } from 'react-native';
 
 import { HapticTab } from '@/components/haptic-tab';
+import { useAuth } from '@/contexts/auth-context';
 import { useTheme } from '@/contexts/theme-context';
 
 // Custom Tab Icon Component
@@ -16,6 +17,11 @@ function TabIcon({ icon, color, focused }: { icon: string; color: string; focuse
 
 export default function TabLayout() {
   const { colors } = useTheme();
+  const { isReady, isLoggedIn } = useAuth();
+
+  if (isReady && !isLoggedIn) {
+    return <Redirect href="/(auth)/login" />;
+  }
 
   return (
     <Tabs

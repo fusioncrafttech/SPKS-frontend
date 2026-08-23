@@ -1,18 +1,21 @@
-import { useState } from 'react';
-import {
-  StyleSheet,
-  View,
-  ScrollView,
-  TouchableOpacity,
-  StatusBar,
-  Platform,
-  Modal,
-  FlatList,
-} from 'react-native';
 import { router } from 'expo-router';
+import { useEffect, useState } from 'react';
+import {
+    FlatList,
+    Modal,
+    Platform,
+    ScrollView,
+    StatusBar,
+    StyleSheet,
+    TouchableOpacity,
+    View,
+} from 'react-native';
 
-import { useTheme } from '@/contexts/theme-context';
 import { ThemedText } from '@/components/themed-text';
+import { useAuth } from '@/contexts/auth-context';
+import { useTheme } from '@/contexts/theme-context';
+import { api, asList } from '@/lib/api';
+import { updateProfile } from '@/lib/auth';
 
 const STATUSBAR_HEIGHT = Platform.OS === 'ios' ? 44 : StatusBar.currentHeight || 24;
 
@@ -26,23 +29,58 @@ const INDIAN_STATES = [
 
 export default function ProgressScreen() {
   const { colors } = useTheme();
-  const progressData = [
-    { id: '1', course: 'TNPSC', completed: 45, total: 100, color: colors.gradient1[0] },
-    { id: '2', course: 'RRB', completed: 30, total: 80, color: colors.gradient2[0] },
-    { id: '3', course: 'TNUSRB', completed: 60, total: 120, color: colors.gradient3[0] },
-    { id: '4', course: 'Current Affairs', completed: 25, total: 50, color: colors.gradient4[0] },
+  const { user, setUser } = useAuth();
+  const fallbackProgress = [
+    { id: '1', course: 'TNPSC', completed: 0, total: 1, color: colors.gradient1[0] },
+    { id: '2', course: 'RRB', completed: 0, total: 1, color: colors.gradient2[0] },
+    { id: '3', course: 'TNUSRB', completed: 0, total: 1, color: colors.gradient3[0] },
+    { id: '4', course: 'Current Affairs', completed: 0, total: 1, color: colors.gradient4[0] },
   ];
-
-  const [selectedState, setSelectedState] = useState('Tamil Nadu');
+  const [progressData, setProgressData] = useState(fallbackProgress);
+  const [stats, setStats] = useState({ testsCompleted: 0, averageScore: 0, dailyStreak: 0 });
+  const [selectedState, setSelectedState] = useState(user?.state || 'Tamil Nadu');
   const [showStateModal, setShowStateModal] = useState(false);
+
+  useEffect(() => {
+    api.get<Record<string, any>[]>('/api/users/me/course-progress')
+      .then((items) => {
+        const list = asList(items);
+        if (!list.length) return;
+        setProgressData(list.map((item, index) => ({
+          id: String(item.id || item.courseId || index),
+          course: item.course || item.courseName || item.name || 'Course',
+          completed: Number(item.completed ?? item.completedLessons ?? item.correctCount ?? 0),
+          total: Number(item.total ?? item.totalLessons ?? item.totalQuestions ?? 1) || 1,
+          color: colors.gradient1[index % colors.gradient1.length],
+        })));
+      })
+      .catch(() => undefined);
+
+    api.get<{ testsCompleted?: number; averageScore?: number; dailyStreak?: number }>('/api/users/me/stats')
+      .then((data) => {
+        if (!data) return;
+        setStats({
+          testsCompleted: data.testsCompleted || 0,
+          averageScore: Math.round(data.averageScore || 0),
+          dailyStreak: data.dailyStreak || 0,
+        });
+      })
+      .catch(() => undefined);
+  }, [colors, user?.id]);
 
   const handleBack = () => {
     router.back();
   };
 
-  const selectState = (state: string) => {
+  const selectState = async (state: string) => {
     setSelectedState(state);
     setShowStateModal(false);
+    try {
+      const updated = await updateProfile({ state });
+      setUser(updated);
+    } catch {
+      // Keep the local selection if the API is unavailable.
+    }
   };
 
   const totalCompleted = progressData.reduce((sum, item) => sum + item.completed, 0);
@@ -133,15 +171,15 @@ export default function ProgressScreen() {
         {/* Stats Summary */}
         <View style={styles.statsRow}>
           <View style={[styles.statBox, { backgroundColor: colors.card }]}>
-            <ThemedText style={[styles.statValue, { color: colors.tint }]}>156</ThemedText>
-            <ThemedText style={[styles.statLabel, { color: colors.textSecondary }]}>Quizzes Taken</ThemedText>
+            <ThemedText style={[styles.statValue, { color: colors.tint }]}>{stats.testsCompleted}</ThemedText>
+            <ThemedText style={[styles.statLabel, { color: colors.textSecondary }]}>Tests Taken</ThemedText>
           </View>
           <View style={[styles.statBox, { backgroundColor: colors.card }]}>
-            <ThemedText style={[styles.statValue, { color: colors.tint }]}>89%</ThemedText>
+            <ThemedText style={[styles.statValue, { color: colors.tint }]}>{stats.averageScore}%</ThemedText>
             <ThemedText style={[styles.statLabel, { color: colors.textSecondary }]}>Avg. Score</ThemedText>
           </View>
           <View style={[styles.statBox, { backgroundColor: colors.card }]}>
-            <ThemedText style={[styles.statValue, { color: colors.tint }]}>12</ThemedText>
+            <ThemedText style={[styles.statValue, { color: colors.tint }]}>{stats.dailyStreak}</ThemedText>
             <ThemedText style={[styles.statLabel, { color: colors.textSecondary }]}>Day Streak</ThemedText>
           </View>
         </View>

@@ -3,6 +3,9 @@ import { router } from 'expo-router';
 
 import { useTheme } from '@/contexts/theme-context';
 import { ThemedText } from '@/components/themed-text';
+import { ApiResultsModal } from '@/components/ui/api-results-modal';
+import { useCatalogResults } from '@/hooks/use-catalog-results';
+import { loadCourseItems } from '@/lib/catalog';
 
 const STATUSBAR_HEIGHT = Platform.OS === 'ios' ? 44 : StatusBar.currentHeight || 24;
 
@@ -19,10 +22,11 @@ const UNITS = [
 
 export default function OutsideSourceScreen() {
   const { colors } = useTheme();
+  const results = useCatalogResults();
 
   const handleBack = () => router.back();
   const handleUnitPress = (id: string, title: string) => {
-    console.log(`Outside source - Unit ${id}: ${title}`);
+    results.show(title, () => loadCourseItems('tnpsc', 'outside-sources', { search: title }));
   };
 
   return (
@@ -60,6 +64,7 @@ export default function OutsideSourceScreen() {
           ))}
         </View>
       </ScrollView>
+      <ApiResultsModal visible={results.visible} title={results.title} loading={results.loading} items={results.items} emptyMessage={results.emptyMessage} onClose={results.close} />
     </View>
   );
 }

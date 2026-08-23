@@ -1,8 +1,11 @@
-import { StyleSheet, View, ScrollView, TouchableOpacity, StatusBar, Platform } from 'react-native';
 import { router } from 'expo-router';
+import { Platform, ScrollView, StatusBar, StyleSheet, TouchableOpacity, View } from 'react-native';
 
-import { useTheme } from '@/contexts/theme-context';
 import { ThemedText } from '@/components/themed-text';
+import { ApiResultsModal } from '@/components/ui/api-results-modal';
+import { useTheme } from '@/contexts/theme-context';
+import { useCatalogResults } from '@/hooks/use-catalog-results';
+import { loadCourseItems } from '@/lib/catalog';
 
 const STATUSBAR_HEIGHT = Platform.OS === 'ios' ? 44 : StatusBar.currentHeight || 24;
 
@@ -19,10 +22,11 @@ const GK_PARTS = [
 
 export default function NotesScreen() {
   const { colors } = useTheme();
+  const results = useCatalogResults();
 
   const handleBack = () => router.back();
   const handlePartPress = (id: string, title: string) => {
-    console.log(`TNUSRB Notes - ${id}: ${title}`);
+    results.show(title, () => loadCourseItems('tnusrb', 'notes', { search: title }));
   };
 
   return (
@@ -90,6 +94,7 @@ export default function NotesScreen() {
           ))}
         </View>
       </ScrollView>
+      <ApiResultsModal visible={results.visible} title={results.title} loading={results.loading} items={results.items} emptyMessage={results.emptyMessage} onClose={results.close} />
     </View>
   );
 }

@@ -1,8 +1,10 @@
 import { DarkTheme, DefaultTheme, ThemeProvider as NavThemeProvider } from '@react-navigation/native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { ActivityIndicator, View } from 'react-native';
 import 'react-native-reanimated';
 
+import { AuthProvider, useAuth } from '@/contexts/auth-context';
 import { ThemeProvider, useTheme } from '@/contexts/theme-context';
 
 export const unstable_settings = {
@@ -10,7 +12,16 @@ export const unstable_settings = {
 };
 
 function RootLayoutNav() {
-  const { isDark } = useTheme();
+  const { isDark, colors } = useTheme();
+  const { isReady } = useAuth();
+
+  if (!isReady) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background }}>
+        <ActivityIndicator color={colors.tint} />
+      </View>
+    );
+  }
 
   return (
     <NavThemeProvider value={isDark ? DarkTheme : DefaultTheme}>
@@ -32,7 +43,9 @@ function RootLayoutNav() {
 export default function RootLayout() {
   return (
     <ThemeProvider>
-      <RootLayoutNav />
+      <AuthProvider>
+        <RootLayoutNav />
+      </AuthProvider>
     </ThemeProvider>
   );
 }

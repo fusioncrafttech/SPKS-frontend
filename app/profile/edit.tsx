@@ -1,55 +1,48 @@
-import { useState, useEffect } from 'react';
-import {
-  StyleSheet,
-  View,
-  ScrollView,
-  TouchableOpacity,
-  StatusBar,
-  Platform,
-  Alert,
-  Image,
-  KeyboardAvoidingView,
-  Keyboard,
-  TouchableWithoutFeedback,
-} from 'react-native';
-import { router } from 'expo-router';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
+import { router } from 'expo-router';
+import { useEffect, useState } from 'react';
+import {
+    Alert,
+    Image,
+    Keyboard,
+    KeyboardAvoidingView,
+    Platform,
+    ScrollView,
+    StatusBar,
+    StyleSheet,
+    TouchableOpacity,
+    TouchableWithoutFeedback,
+    View,
+} from 'react-native';
 
-import { useTheme } from '@/contexts/theme-context';
 import { ThemedText } from '@/components/themed-text';
 import { TextInput } from '@/components/ui/text-input';
+import { useAuth } from '@/contexts/auth-context';
+import { useTheme } from '@/contexts/theme-context';
+import { mapProfile, updateProfile, uploadProfileImage } from '@/lib/auth';
 
 const STATUSBAR_HEIGHT = Platform.OS === 'ios' ? 44 : StatusBar.currentHeight || 24;
 
 export default function EditProfileScreen() {
   const { colors } = useTheme();
-  const [firstName, setFirstName] = useState('Android');
-  const [lastName, setLastName] = useState('User');
-  const [email, setEmail] = useState('android@example.com');
-  const [phone, setPhone] = useState('9876543210');
-  const [profileImage, setProfileImage] = useState<string | null>(null);
+  const { user, setUser } = useAuth();
+  const mapped = mapProfile(user);
+  const [firstName, setFirstName] = useState(mapped?.firstName || '');
+  const [lastName, setLastName] = useState(mapped?.lastName || '');
+  const [email, setEmail] = useState(mapped?.email || '');
+  const [phone, setPhone] = useState(mapped?.phone || '');
+  const [profileImage, setProfileImage] = useState<string | null>(mapped?.profileImage || null);
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    loadProfile();
-  }, []);
-
-  const loadProfile = async () => {
-    try {
-      const profile = await AsyncStorage.getItem('userProfile');
-      if (profile) {
-        const data = JSON.parse(profile);
-        setFirstName(data.firstName || 'Android');
-        setLastName(data.lastName || 'User');
-        setEmail(data.email || 'android@example.com');
-        setPhone(data.phone || '9876543210');
-        setProfileImage(data.profileImage || null);
-      }
-    } catch (error) {
-      console.log('Error loading profile:', error);
-    }
-  };
+    const next = mapProfile(user);
+    if (!next) return;
+    setFirstName(next.firstName);
+    setLastName(next.lastName);
+    setEmail(next.email);
+    setPhone(next.phone || '');
+    setProfileImage(next.profileImage);
+  }, [user]);
 
   const pickImage = async () => {
     // Request permission
@@ -122,19 +115,25 @@ export default function EditProfileScreen() {
 
     setIsLoading(true);
     try {
-      const profileData = {
+      let savedUser = user;
+      if (profileImage && profileImage !== user?.profileImage && (profileImage.startsWith('file://') || profileImage.startsWith('content://'))) {
+        savedUser = await uploadProfileImage({
+          uri: profileImage,
+          name: 'profile-image.jpg',
+          type: 'image/jpeg',
+        });
+      }
+      savedUser = await updateProfile({
         firstName: firstName.trim(),
         lastName: lastName.trim(),
-        email: email.trim(),
-        phone: phone.trim(),
-        profileImage: profileImage,
-      };
-      await AsyncStorage.setItem('userProfile', JSON.stringify(profileData));
+        phone: phone.trim() || undefined,
+      });
+      setUser(savedUser);
       Alert.alert('Success', 'Profile updated successfully!', [
         { text: 'OK', onPress: () => router.back() },
       ]);
     } catch (error) {
-      Alert.alert('Error', 'Failed to save profile');
+      Alert.alert('Error', error instanceof Error ? error.message : 'Failed to save profile');
     } finally {
       setIsLoading(false);
     }
@@ -218,6 +217,7 @@ export default function EditProfileScreen() {
             onChangeText={setEmail}
             keyboardType="email-address"
             autoCapitalize="none"
+            editable={false}
           />
 
           <TextInput

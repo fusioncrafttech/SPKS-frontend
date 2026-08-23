@@ -1,8 +1,11 @@
-import { StyleSheet, View, ScrollView, TouchableOpacity, StatusBar, Platform } from 'react-native';
 import { router } from 'expo-router';
+import { Platform, ScrollView, StatusBar, StyleSheet, TouchableOpacity, View } from 'react-native';
 
-import { useTheme } from '@/contexts/theme-context';
 import { ThemedText } from '@/components/themed-text';
+import { ApiResultsModal } from '@/components/ui/api-results-modal';
+import { useTheme } from '@/contexts/theme-context';
+import { useCatalogResults } from '@/hooks/use-catalog-results';
+import { loadCourseItems } from '@/lib/catalog';
 
 const STATUSBAR_HEIGHT = Platform.OS === 'ios' ? 44 : StatusBar.currentHeight || 24;
 
@@ -16,10 +19,15 @@ const GROUPS = [
 
 export default function TestScreen() {
   const { colors } = useTheme();
+  const results = useCatalogResults();
 
   const handleBack = () => router.back();
   const handleGroupPress = (id: string, title: string) => {
-    console.log(`Test - ${title}`);
+    results.show(title, async () => {
+      const groups = await loadCourseItems('tnpsc', 'groups');
+      const group = groups.find((item) => `${item.title || item.name || ''}`.toLowerCase().includes(title.toLowerCase()) || item.id === id);
+      return loadCourseItems('tnpsc', 'tests', group ? { groupId: group.id } : { search: title });
+    });
   };
 
   return (
@@ -57,6 +65,7 @@ export default function TestScreen() {
           ))}
         </View>
       </ScrollView>
+      <ApiResultsModal visible={results.visible} title={results.title} loading={results.loading} items={results.items} emptyMessage={results.emptyMessage} onClose={results.close} />
     </View>
   );
 }

@@ -3,6 +3,9 @@ import { router } from 'expo-router';
 
 import { useTheme } from '@/contexts/theme-context';
 import { ThemedText } from '@/components/themed-text';
+import { ApiResultsModal } from '@/components/ui/api-results-modal';
+import { useCatalogResults } from '@/hooks/use-catalog-results';
+import { loadCourseItems } from '@/lib/catalog';
 
 const STATUSBAR_HEIGHT = Platform.OS === 'ios' ? 44 : StatusBar.currentHeight || 24;
 
@@ -16,10 +19,11 @@ const VIDEO_CATEGORIES = [
 
 export default function VideoScreen() {
   const { colors } = useTheme();
+  const results = useCatalogResults();
 
   const handleBack = () => router.back();
   const handleVideoPress = (id: string, title: string) => {
-    console.log(`TNUSRB Video - Category ${id}: ${title}`);
+    results.show(title, () => loadCourseItems('tnusrb', 'videos', { category: id, search: title }));
   };
 
   return (
@@ -72,6 +76,7 @@ export default function VideoScreen() {
           ))}
         </View>
       </ScrollView>
+      <ApiResultsModal visible={results.visible} title={results.title} loading={results.loading} items={results.items} emptyMessage={results.emptyMessage} onClose={results.close} />
     </View>
   );
 }

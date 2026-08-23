@@ -7,14 +7,31 @@ import {
   Platform,
 } from 'react-native';
 import { router } from 'expo-router';
+import { useEffect, useState } from 'react';
 
 import { useTheme } from '@/contexts/theme-context';
 import { ThemedText } from '@/components/themed-text';
+import { api } from '@/lib/api';
 
 const STATUSBAR_HEIGHT = Platform.OS === 'ios' ? 44 : StatusBar.currentHeight || 24;
 
 export default function TermsScreen() {
   const { colors } = useTheme();
+  const [terms, setTerms] = useState({ title: 'Terms of Service', content: '' });
+  const [privacy, setPrivacy] = useState({ title: 'Privacy Policy', content: '' });
+
+  useEffect(() => {
+    api.get<{ title?: string; content?: string }>('/api/legal/terms')
+      .then((data) => {
+        if (data?.content) setTerms({ title: data.title || 'Terms of Service', content: data.content });
+      })
+      .catch(() => undefined);
+    api.get<{ title?: string; content?: string }>('/api/legal/privacy-policy')
+      .then((data) => {
+        if (data?.content) setPrivacy({ title: data.title || 'Privacy Policy', content: data.content });
+      })
+      .catch(() => undefined);
+  }, []);
 
   const handleBack = () => {
     router.back();
@@ -41,8 +58,12 @@ export default function TermsScreen() {
       >
         {/* Terms of Service */}
         <View style={styles.section}>
-          <ThemedText style={[styles.sectionTitle, { color: colors.text }]}>Terms of Service</ThemedText>
+          <ThemedText style={[styles.sectionTitle, { color: colors.text }]}>{terms.title}</ThemedText>
           <View style={[styles.card, { backgroundColor: colors.card }]}>
+            {terms.content ? (
+              <ThemedText style={[styles.paragraph, { color: colors.textSecondary }]}>{terms.content}</ThemedText>
+            ) : (
+              <>
             <ThemedText style={[styles.paragraph, { color: colors.textSecondary }]}>
               Welcome to our application. By using our services, you agree to be bound by these terms and conditions.
             </ThemedText>
@@ -66,13 +87,19 @@ export default function TermsScreen() {
             <ThemedText style={[styles.paragraph, { color: colors.textSecondary }]}>
               Some parts of the service are billed on a subscription basis. You will be billed in advance on a recurring and periodic basis.
             </ThemedText>
+              </>
+            )}
           </View>
         </View>
 
         {/* Privacy Policy */}
         <View style={styles.section}>
-          <ThemedText style={[styles.sectionTitle, { color: colors.text }]}>Privacy Policy</ThemedText>
+          <ThemedText style={[styles.sectionTitle, { color: colors.text }]}>{privacy.title}</ThemedText>
           <View style={[styles.card, { backgroundColor: colors.card }]}>
+            {privacy.content ? (
+              <ThemedText style={[styles.paragraph, { color: colors.textSecondary }]}>{privacy.content}</ThemedText>
+            ) : (
+              <>
             <ThemedText style={[styles.paragraph, { color: colors.textSecondary }]}>
               Your privacy is important to us. This privacy policy explains how we collect, use, and protect your personal information.
             </ThemedText>
@@ -96,6 +123,8 @@ export default function TermsScreen() {
             <ThemedText style={[styles.paragraph, { color: colors.textSecondary }]}>
               We take reasonable measures to help protect personal information from loss, theft, misuse, and unauthorized access.
             </ThemedText>
+              </>
+            )}
           </View>
         </View>
 

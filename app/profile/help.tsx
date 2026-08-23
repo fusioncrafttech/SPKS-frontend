@@ -8,9 +8,11 @@ import {
   Linking,
 } from 'react-native';
 import { router } from 'expo-router';
+import { useEffect, useState } from 'react';
 
 import { useTheme } from '@/contexts/theme-context';
 import { ThemedText } from '@/components/themed-text';
+import { api, asList } from '@/lib/api';
 
 const STATUSBAR_HEIGHT = Platform.OS === 'ios' ? 44 : StatusBar.currentHeight || 24;
 
@@ -39,6 +41,21 @@ const faqs = [
 
 export default function HelpScreen() {
   const { colors } = useTheme();
+  const [faqItems, setFaqItems] = useState(faqs);
+
+  useEffect(() => {
+    api.get<{ id?: string; question?: string; answer?: string }[]>('/api/help/faqs')
+      .then((items) => {
+        const list = asList(items);
+        if (!list.length) return;
+        setFaqItems(list.map((item, index) => ({
+          id: String(item.id || index),
+          question: item.question || 'Question',
+          answer: item.answer || '',
+        })));
+      })
+      .catch(() => undefined);
+  }, []);
 
   const handleBack = () => {
     router.back();
@@ -119,13 +136,13 @@ export default function HelpScreen() {
         <ThemedText style={[styles.sectionTitle, { color: colors.text }]}>Frequently Asked Questions</ThemedText>
         
         <View style={[styles.faqCard, { backgroundColor: colors.card }]}>
-          {faqs.map((faq, index) => (
+          {faqItems.map((faq, index) => (
             <View key={faq.id}>
               <View style={styles.faqItem}>
                 <ThemedText style={[styles.faqQuestion, { color: colors.text }]}>{faq.question}</ThemedText>
                 <ThemedText style={[styles.faqAnswer, { color: colors.textSecondary }]}>{faq.answer}</ThemedText>
               </View>
-              {index < faqs.length - 1 && <View style={[styles.divider, { backgroundColor: colors.border }]} />}
+              {index < faqItems.length - 1 && <View style={[styles.divider, { backgroundColor: colors.border }]} />}
             </View>
           ))}
         </View>
