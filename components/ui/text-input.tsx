@@ -20,8 +20,9 @@ export function TextInput({
 }: ThemedTextInputProps) {
   const textColor = useThemeColor({ light: lightColor, dark: darkColor }, 'text');
   const backgroundColor = useThemeColor({ light: '#f5f5f5', dark: '#2a2a2a' }, 'background');
-  const borderColor = error ? '#dc3545' : useThemeColor({ light: '#ddd', dark: '#444' }, 'icon');
+  const defaultBorderColor = useThemeColor({ light: '#ddd', dark: '#444' }, 'icon');
   const placeholderColor = useThemeColor({ light: '#999', dark: '#666' }, 'icon');
+  const borderColor = error ? '#dc3545' : defaultBorderColor;
 
   return (
     <View style={styles.container}>

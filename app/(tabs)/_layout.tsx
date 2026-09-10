@@ -1,13 +1,13 @@
 import { Redirect, Tabs } from 'expo-router';
 import React from 'react';
-import { StyleSheet, View, Text } from 'react-native';
+import { ColorValue, StyleSheet, View, Text } from 'react-native';
 
 import { HapticTab } from '@/components/haptic-tab';
 import { useAuth } from '@/contexts/auth-context';
 import { useTheme } from '@/contexts/theme-context';
 
 // Custom Tab Icon Component
-function TabIcon({ icon, color, focused }: { icon: string; color: string; focused: boolean }) {
+function TabIcon({ icon, color, focused }: { icon: string; color: ColorValue; focused: boolean }) {
   return (
     <View style={styles.iconContainer}>
       <Text style={[styles.icon, { color }]}>{icon}</Text>
