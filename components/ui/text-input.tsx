@@ -1,46 +1,38 @@
 import { StyleSheet, TextInput as RNTextInput, View, type TextInputProps } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
-import { useThemeColor } from '@/hooks/use-theme-color';
+import { useTheme } from '@/contexts/theme-context';
 
 export type ThemedTextInputProps = TextInputProps & {
   label?: string;
   error?: string;
-  lightColor?: string;
-  darkColor?: string;
 };
 
 export function TextInput({
   label,
   error,
   style,
-  lightColor,
-  darkColor,
   ...rest
 }: ThemedTextInputProps) {
-  const textColor = useThemeColor({ light: lightColor, dark: darkColor }, 'text');
-  const backgroundColor = useThemeColor({ light: '#f5f5f5', dark: '#2a2a2a' }, 'background');
-  const defaultBorderColor = useThemeColor({ light: '#ddd', dark: '#444' }, 'icon');
-  const placeholderColor = useThemeColor({ light: '#999', dark: '#666' }, 'icon');
-  const borderColor = error ? '#dc3545' : defaultBorderColor;
+  const { colors } = useTheme();
 
   return (
     <View style={styles.container}>
-      {label && <ThemedText style={styles.label}>{label}</ThemedText>}
+      {label && <ThemedText style={[styles.label, { color: colors.text }]}>{label}</ThemedText>}
       <RNTextInput
         style={[
           styles.input,
           {
-            color: textColor,
-            backgroundColor,
-            borderColor,
+            color: colors.text,
+            backgroundColor: colors.inputBg,
+            borderColor: error ? colors.danger : colors.border,
           },
           style,
         ]}
-        placeholderTextColor={placeholderColor}
+        placeholderTextColor={colors.textMuted}
         {...rest}
       />
-      {error && <ThemedText style={styles.error}>{error}</ThemedText>}
+      {error && <ThemedText style={[styles.error, { color: colors.danger }]}>{error}</ThemedText>}
     </View>
   );
 }
@@ -50,20 +42,20 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   label: {
-    fontSize: 14,
-    fontWeight: '600',
-    marginBottom: 6,
+    fontSize: 13,
+    fontWeight: '700',
+    marginBottom: 8,
   },
   input: {
-    height: 50,
+    height: 52,
     borderWidth: 1,
-    borderRadius: 10,
+    borderRadius: 14,
     paddingHorizontal: 16,
     fontSize: 16,
   },
   error: {
-    color: '#dc3545',
     fontSize: 12,
-    marginTop: 4,
+    marginTop: 6,
+    fontWeight: '600',
   },
 });

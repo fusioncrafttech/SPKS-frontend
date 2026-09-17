@@ -22,9 +22,25 @@ function RootLayoutNav() {
     );
   }
 
+  const navTheme = {
+    ...(isDark ? DarkTheme : DefaultTheme),
+    colors: {
+      ...(isDark ? DarkTheme.colors : DefaultTheme.colors),
+      background: colors.background,
+      card: colors.card,
+      text: colors.text,
+      border: colors.border,
+      primary: colors.tint,
+    },
+  };
+
   return (
-    <NavThemeProvider value={isDark ? DarkTheme : DefaultTheme}>
-      <Stack>
+    <NavThemeProvider value={navTheme}>
+      <Stack
+        screenOptions={{
+          contentStyle: { backgroundColor: colors.background },
+        }}
+      >
         <Stack.Screen name="(auth)" options={{ headerShown: false }} />
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="tnpsc" options={{ headerShown: false }} />
@@ -32,6 +48,15 @@ function RootLayoutNav() {
         <Stack.Screen name="tnusrb" options={{ headerShown: false }} />
         <Stack.Screen name="current-affairs" options={{ headerShown: false }} />
         <Stack.Screen name="profile" options={{ headerShown: false }} />
+        <Stack.Screen name="study" options={{ headerShown: false }} />
+        <Stack.Screen name="checkout" options={{ headerShown: false }} />
+        <Stack.Screen name="content/[id]" options={{ headerShown: false }} />
+        <Stack.Screen name="video/[id]" options={{ headerShown: false }} />
+        <Stack.Screen name="subject/[id]" options={{ headerShown: false }} />
+        <Stack.Screen name="chapter/[id]" options={{ headerShown: false }} />
+        <Stack.Screen name="lesson/[id]" options={{ headerShown: false }} />
+        <Stack.Screen name="test/[attemptId]" options={{ headerShown: false }} />
+        <Stack.Screen name="test-result/[attemptId]" options={{ headerShown: false }} />
         <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
       </Stack>
       <StatusBar style={isDark ? 'light' : 'dark'} />

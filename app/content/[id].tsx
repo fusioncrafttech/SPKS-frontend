@@ -1,0 +1,115 @@
+import Ionicons from '@expo/vector-icons/Ionicons';
+import { router, useLocalSearchParams } from 'expo-router';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, Alert, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { WebView } from 'react-native-webview';
+
+import { ThemedText } from '@/components/themed-text';
+import { PageHeader } from '@/components/ui/page-header';
+import { PrimaryButton } from '@/components/ui/primary-button';
+import { Screen } from '@/components/ui/screen';
+import { useTheme } from '@/contexts/theme-context';
+import { completeLesson, downloadContent, getContent, isLockedItem, markLessonProgress, resolveContentFileUrl, toggleBookmark } from '@/lib/study';
+import { isPremiumRequired, promptPremium } from '@/lib/tests';
+
+export default function ContentScreen() {
+  const { colors } = useTheme();
+  const { id } = useLocalSearchParams<{ id: string }>();
+  const [loading, setLoading] = useState(true);
+  const [bookmarked, setBookmarked] = useState(false);
+  const [content, setContent] = useState<Record<string, any> | null>(null);
+  const [fileUrl, setFileUrl] = useState('');
+
+  useEffect(() => {
+    if (!id) return;
+    (async () => {
+      try {
+        const data = await getContent(id);
+        setContent(data);
+        setBookmarked(Boolean(data?.isBookmarked));
+        if (data?.lessonId) void markLessonProgress(String(data.lessonId));
+        if (isLockedItem(data || {})) {
+          promptPremium('This PDF is locked. Upgrade your plan to open it.');
+          return;
+        }
+        const url = await resolveContentFileUrl(id, data?.fileUrl || data?.sourceUrl || data?.url);
+        setFileUrl(url);
+      } catch (error) {
+        if (isPremiumRequired(error)) return;
+        Alert.alert('Content', error instanceof Error ? error.message : 'Could not load this item.');
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [id]);
+
+  const html = content?.html || content?.body || content?.content;
+  const locked = isLockedItem(content || {});
+
+  const handleBookmark = async () => {
+    if (!id) return;
+    try {
+      await toggleBookmark('content', id, bookmarked);
+      setBookmarked((value) => !value);
+    } catch (error) {
+      Alert.alert('Bookmark', error instanceof Error ? error.message : 'Could not update bookmark.');
+    }
+  };
+
+  const handleComplete = async () => {
+    if (content?.lessonId) await completeLesson(String(content.lessonId));
+    Alert.alert('Saved', 'Lesson marked complete.');
+  };
+
+  return (
+    <Screen>
+      <PageHeader
+        title={content?.title || 'Content'}
+        right={
+          <TouchableOpacity onPress={handleBookmark} style={[styles.iconBtn, { backgroundColor: colors.card }]}>
+            <Ionicons name={bookmarked ? 'bookmark' : 'bookmark-outline'} size={18} color={colors.text} />
+          </TouchableOpacity>
+        }
+      />
+      {loading ? (
+        <View style={styles.center}>
+          <ActivityIndicator color={colors.tint} />
+        </View>
+      ) : locked ? (
+        <View style={styles.center}>
+          <ThemedText style={{ color: colors.text, fontWeight: '800', marginBottom: 8 }}>Premium content</ThemedText>
+          <ThemedText style={{ color: colors.textSecondary, textAlign: 'center', marginBottom: 16 }}>Upgrade to open this file.</ThemedText>
+          <PrimaryButton title="View plans" onPress={() => router.push('/(tabs)/price')} />
+        </View>
+      ) : fileUrl ? (
+        <WebView source={{ uri: fileUrl }} style={{ flex: 1 }} />
+      ) : html ? (
+        <WebView originWhitelist={['*']} source={{ html: String(html) }} style={{ flex: 1 }} />
+      ) : (
+        <View style={styles.center}>
+          <ThemedText style={{ color: colors.text, fontWeight: '800', marginBottom: 8 }}>{content?.title || 'Content'}</ThemedText>
+          <ThemedText style={{ color: colors.textSecondary, textAlign: 'center', marginBottom: 16 }}>
+            {content?.description || content?.summary || 'No fileUrl yet. Upload the PDF in admin first.'}
+          </ThemedText>
+        </View>
+      )}
+      {!locked && id ? (
+        <View style={[styles.footer, { backgroundColor: colors.card, borderTopColor: colors.border }]}>
+          <PrimaryButton title="Download" onPress={() => downloadContent(String(id), fileUrl)} />
+          {content?.lessonId ? (
+            <TouchableOpacity onPress={handleComplete} style={styles.complete}>
+              <ThemedText style={{ color: colors.tint, fontWeight: '700' }}>Mark complete</ThemedText>
+            </TouchableOpacity>
+          ) : null}
+        </View>
+      ) : null}
+    </Screen>
+  );
+}
+
+const styles = StyleSheet.create({
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
+  iconBtn: { width: 42, height: 42, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  footer: { padding: 16, borderTopWidth: 1, gap: 10 },
+  complete: { alignItems: 'center', paddingVertical: 8 },
+});

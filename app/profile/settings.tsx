@@ -1,5 +1,5 @@
+import Ionicons from '@expo/vector-icons/Ionicons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
     Alert,
@@ -8,7 +8,6 @@ import {
     Modal,
     Platform,
     ScrollView,
-    StatusBar,
     StyleSheet,
     Switch,
     TouchableOpacity,
@@ -16,11 +15,12 @@ import {
 } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
+import { PageHeader } from '@/components/ui/page-header';
+import { Screen } from '@/components/ui/screen';
 import { TextInput } from '@/components/ui/text-input';
 import { useTheme } from '@/contexts/theme-context';
+import { changePassword } from '@/lib/auth';
 import { api } from '@/lib/api';
-
-const STATUSBAR_HEIGHT = Platform.OS === 'ios' ? 44 : StatusBar.currentHeight || 24;
 
 const LANGUAGES = [
   { id: 'en', name: 'English', native: 'English' },
@@ -47,6 +47,7 @@ export default function SettingsScreen() {
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [passwordLoading, setPasswordLoading] = useState(false);
 
   useEffect(() => {
     loadSettings();
@@ -122,31 +123,24 @@ export default function SettingsScreen() {
       return;
     }
 
-    Alert.alert(
-      'Password change',
-      'Password updates are handled through email reset. Use Forgot password on the login screen.',
-      [{ text: 'OK', onPress: () => setShowPasswordModal(false) }],
-    );
-  };
-
-  const handleBack = () => {
-    router.back();
+    setPasswordLoading(true);
+    try {
+      await changePassword({ currentPassword, newPassword });
+      setShowPasswordModal(false);
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      Alert.alert('Password updated', 'Use your new password the next time you sign in.');
+    } catch (error) {
+      Alert.alert('Error', error instanceof Error ? error.message : 'Could not change password.');
+    } finally {
+      setPasswordLoading(false);
+    }
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <StatusBar barStyle={colors.statusBar} backgroundColor="transparent" translucent />
-      <View style={styles.statusBarSpace} />
-
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={handleBack} style={[styles.backButton, { backgroundColor: colors.card }]}>
-          <ThemedText style={[styles.backIcon, { color: colors.text }]}>←</ThemedText>
-        </TouchableOpacity>
-        <ThemedText style={[styles.headerTitle, { color: colors.text }]}>Settings</ThemedText>
-        <View style={styles.placeholder} />
-      </View>
-
+    <Screen>
+      <PageHeader title="Settings" />
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
@@ -157,7 +151,7 @@ export default function SettingsScreen() {
         <View style={[styles.card, { backgroundColor: colors.card }]}>
           <View style={styles.settingItem}>
             <View style={styles.settingInfo}>
-              <ThemedText style={styles.settingIcon}>🌙</ThemedText>
+              <Ionicons name="moon-outline" size={20} color={colors.tint} style={styles.settingIcon} />
               <View style={styles.settingTextContainer}>
                 <ThemedText style={[styles.settingLabel, { color: colors.text }]}>Dark Mode</ThemedText>
                 <ThemedText style={[styles.settingDescription, { color: colors.textSecondary }]}>
@@ -182,7 +176,7 @@ export default function SettingsScreen() {
             onPress={() => setShowLanguageModal(true)}
           >
             <View style={styles.settingInfo}>
-              <ThemedText style={styles.settingIcon}>🌐</ThemedText>
+              <Ionicons name="globe-outline" size={20} color={colors.tint} style={styles.settingIcon} />
               <View style={styles.settingTextContainer}>
                 <ThemedText style={[styles.settingLabel, { color: colors.text }]}>App Language</ThemedText>
                 <ThemedText style={[styles.settingDescription, { color: colors.textSecondary }]}>
@@ -202,7 +196,7 @@ export default function SettingsScreen() {
             onPress={() => setShowPasswordModal(true)}
           >
             <View style={styles.settingInfo}>
-              <ThemedText style={styles.settingIcon}>🔒</ThemedText>
+              <Ionicons name="lock-closed-outline" size={20} color={colors.tint} style={styles.settingIcon} />
               <View style={styles.settingTextContainer}>
                 <ThemedText style={[styles.settingLabel, { color: colors.text }]}>Change Password</ThemedText>
                 <ThemedText style={[styles.settingDescription, { color: colors.textSecondary }]}>Update your password</ThemedText>
@@ -217,7 +211,7 @@ export default function SettingsScreen() {
         <View style={[styles.card, { backgroundColor: colors.card }]}>
           <View style={styles.settingItem}>
             <View style={styles.settingInfo}>
-              <ThemedText style={styles.settingIcon}>📧</ThemedText>
+              <Ionicons name="mail-outline" size={20} color={colors.tint} style={styles.settingIcon} />
               <ThemedText style={[styles.settingLabel, { color: colors.text }]}>Email Notifications</ThemedText>
             </View>
             <Switch
@@ -237,7 +231,7 @@ export default function SettingsScreen() {
         <View style={[styles.card, { backgroundColor: colors.card }]}>
           <View style={styles.settingItem}>
             <View style={styles.settingInfo}>
-              <ThemedText style={styles.settingIcon}>▶️</ThemedText>
+              <Ionicons name="play-outline" size={20} color={colors.tint} style={styles.settingIcon} />
               <ThemedText style={[styles.settingLabel, { color: colors.text }]}>Auto-play Videos</ThemedText>
             </View>
             <Switch
@@ -253,7 +247,7 @@ export default function SettingsScreen() {
           <View style={[styles.divider, { backgroundColor: colors.border }]} />
           <View style={styles.settingItem}>
             <View style={styles.settingInfo}>
-              <ThemedText style={styles.settingIcon}>📥</ThemedText>
+              <Ionicons name="download-outline" size={20} color={colors.tint} style={styles.settingIcon} />
               <ThemedText style={[styles.settingLabel, { color: colors.text }]}>Download over WiFi only</ThemedText>
             </View>
             <Switch
@@ -271,9 +265,21 @@ export default function SettingsScreen() {
         {/* Other Section */}
         <ThemedText style={[styles.sectionTitle, { color: colors.textSecondary }]}>Other</ThemedText>
         <View style={[styles.card, { backgroundColor: colors.card }]}>
-          <TouchableOpacity style={styles.linkItem}>
+          <TouchableOpacity
+            style={styles.linkItem}
+            onPress={async () => {
+              try {
+                const keys = await AsyncStorage.getAllKeys();
+                const keep = ['spks_access_token', 'spks_refresh_token', 'userProfile', 'appTheme', 'appSettings'];
+                await AsyncStorage.multiRemove(keys.filter((key) => !keep.includes(key)));
+                Alert.alert('Cache cleared', 'Temporary files on this device were removed.');
+              } catch (error) {
+                Alert.alert('Cache', error instanceof Error ? error.message : 'Could not clear cache.');
+              }
+            }}
+          >
             <View style={styles.settingInfo}>
-              <ThemedText style={styles.settingIcon}>🗑️</ThemedText>
+              <Ionicons name="trash-outline" size={20} color={colors.tint} style={styles.settingIcon} />
               <ThemedText style={[styles.settingLabel, { color: colors.text }]}>Clear Cache</ThemedText>
             </View>
             <ThemedText style={[styles.linkArrow, { color: colors.textMuted }]}>›</ThemedText>
@@ -389,55 +395,20 @@ export default function SettingsScreen() {
               <TouchableOpacity
                 style={[styles.changePasswordButton, { backgroundColor: colors.tint }]}
                 onPress={handleChangePassword}
+                disabled={passwordLoading}
               >
-                <ThemedText style={styles.changePasswordText}>Change Password</ThemedText>
+                <ThemedText style={styles.changePasswordText}>{passwordLoading ? 'Saving...' : 'Change Password'}</ThemedText>
               </TouchableOpacity>
               </ScrollView>
             </View>
           </KeyboardAvoidingView>
         </View>
       </Modal>
-    </View>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  statusBarSpace: {
-    height: STATUSBAR_HEIGHT,
-    backgroundColor: 'transparent',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  backIcon: {
-    fontSize: 20,
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-  },
-  placeholder: {
-    width: 40,
-  },
   scrollView: {
     flex: 1,
   },
@@ -477,7 +448,6 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   settingIcon: {
-    fontSize: 20,
     marginRight: 12,
   },
   settingLabel: {

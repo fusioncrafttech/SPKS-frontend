@@ -1,47 +1,37 @@
-import {
-  StyleSheet,
-  View,
-  ScrollView,
-  TouchableOpacity,
-  StatusBar,
-  Platform,
-  Linking,
-} from 'react-native';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
+import { Linking, StyleSheet, TouchableOpacity, View } from 'react-native';
 
-import { useTheme } from '@/contexts/theme-context';
 import { ThemedText } from '@/components/themed-text';
+import { AppCard } from '@/components/ui/app-card';
+import { HeroBanner } from '@/components/ui/hero-banner';
+import { PageHeader } from '@/components/ui/page-header';
+import { PrimaryButton } from '@/components/ui/primary-button';
+import { Screen, ScreenScroll } from '@/components/ui/screen';
+import { SectionHeading } from '@/components/ui/section-heading';
+import { Brand } from '@/constants/brand';
+import { useTheme } from '@/contexts/theme-context';
 import { api, asList } from '@/lib/api';
-
-const STATUSBAR_HEIGHT = Platform.OS === 'ios' ? 44 : StatusBar.currentHeight || 24;
+import { getHelpContact } from '@/lib/study';
 
 const faqs = [
-  {
-    id: '1',
-    question: 'How do I reset my password?',
-    answer: 'Go to Profile > Settings > Change Password to reset your password.',
-  },
-  {
-    id: '2',
-    question: 'How can I download courses for offline use?',
-    answer: 'Tap the download icon on any course to save it for offline viewing.',
-  },
-  {
-    id: '3',
-    question: 'How do I track my progress?',
-    answer: 'Go to Profile > My Progress to see your learning statistics and course completion.',
-  },
-  {
-    id: '4',
-    question: 'Can I change my subscription plan?',
-    answer: 'Yes, go to the Price tab to view and change your subscription plan.',
-  },
+  { id: '1', question: 'How do I reset my password?', answer: 'Go to Profile > Settings > Change Password, or use Forgot password on login.' },
+  { id: '2', question: 'How can I download courses for offline use?', answer: 'Open a lesson and tap Download if a file is available.' },
+  { id: '3', question: 'How do I track my progress?', answer: 'Go to Profile > Progress to see course completion and test history.' },
+  { id: '4', question: 'Can I change my subscription plan?', answer: 'Yes, go to the Plans tab to view and change your subscription plan.' },
 ];
 
 export default function HelpScreen() {
   const { colors } = useTheme();
   const [faqItems, setFaqItems] = useState(faqs);
+  const [contact, setContact] = useState({
+    phone: '+91 9360121830',
+    email: 'fusioncraft.gmail.com',
+    whatsapp: '+91 9360121830',
+    hours: 'Monday - Friday, 9:00 AM - 6:00 PM',
+    address: '',
+  });
 
   useEffect(() => {
     api.get<{ id?: string; question?: string; answer?: string }[]>('/api/help/faqs')
@@ -55,267 +45,98 @@ export default function HelpScreen() {
         })));
       })
       .catch(() => undefined);
+
+    getHelpContact().then((data) => {
+      if (!data) return;
+      setContact((current) => ({
+        phone: data.phone || current.phone,
+        email: data.email || current.email,
+        whatsapp: data.whatsapp || data.phone || current.whatsapp,
+        hours: data.hours || current.hours,
+        address: data.address || '',
+      }));
+    });
   }, []);
 
-  const handleBack = () => {
-    router.back();
-  };
-
-  const handleCall = () => {
-    Linking.openURL('tel:+919360121830');
-  };
-
-  const handleEmail = () => {
-    Linking.openURL('mailto:fusioncraft.gmail.com');
-  };
-
-  const handleWhatsApp = () => {
-    Linking.openURL('https://wa.me/919360121830');
-  };
+  const phoneHref = contact.phone.replace(/\s/g, '');
+  const whatsappHref = contact.whatsapp.replace(/[^\d]/g, '');
+  const contacts = [
+    { id: 'phone', label: 'Phone', value: contact.phone, icon: 'call-outline' as const, color: '#059669', onPress: () => Linking.openURL(`tel:${phoneHref}`) },
+    { id: 'email', label: 'Email', value: contact.email, icon: 'mail-outline' as const, color: '#4338CA', onPress: () => Linking.openURL(`mailto:${contact.email}`) },
+    { id: 'whatsapp', label: 'WhatsApp', value: contact.whatsapp, icon: 'logo-whatsapp' as const, color: '#25D366', onPress: () => Linking.openURL(`https://wa.me/${whatsappHref}`) },
+  ];
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <StatusBar barStyle={colors.statusBar} backgroundColor="transparent" translucent />
-      <View style={styles.statusBarSpace} />
-
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={handleBack} style={[styles.backButton, { backgroundColor: colors.card }]}>
-          <ThemedText style={[styles.backIcon, { color: colors.text }]}>←</ThemedText>
-        </TouchableOpacity>
-        <ThemedText style={[styles.headerTitle, { color: colors.text }]}>Help & Support</ThemedText>
-        <View style={styles.placeholder} />
-      </View>
-
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Contact Card */}
-        <View style={[styles.contactCard, { backgroundColor: colors.card }]}>
-          <ThemedText style={[styles.contactTitle, { color: colors.text }]}>Contact Us</ThemedText>
-          <ThemedText style={[styles.contactSubtitle, { color: colors.textSecondary }]}>
-            We're here to help! Reach out to us anytime.
-          </ThemedText>
-
-          <View style={styles.contactMethods}>
-            <TouchableOpacity style={[styles.contactMethod, { backgroundColor: colors.inputBg }]} onPress={handleCall}>
-              <View style={[styles.contactIcon, { backgroundColor: colors.success }]}>
-                <ThemedText style={styles.contactEmoji}>📞</ThemedText>
+    <Screen>
+      <PageHeader title="Help & Support" />
+      <ScreenScroll>
+        <HeroBanner
+          icon="help-circle"
+          eyebrow="Support"
+          title="We're here to help"
+          subtitle="Reach out anytime or browse the FAQs below"
+          gradient={Brand.indigo}
+        />
+        <AppCard style={{ marginBottom: 18 }}>
+          {contacts.map((item) => (
+            <TouchableOpacity key={item.id} style={[styles.contactRow, { backgroundColor: colors.inputBg }]} onPress={item.onPress}>
+              <View style={[styles.contactIcon, { backgroundColor: item.color }]}>
+                <Ionicons name={item.icon} size={18} color="#FFFFFF" />
               </View>
-              <View style={styles.contactInfo}>
-                <ThemedText style={[styles.contactLabel, { color: colors.textSecondary }]}>Phone</ThemedText>
-                <ThemedText style={[styles.contactValue, { color: colors.text }]}>+91 9360121830</ThemedText>
+              <View style={{ flex: 1 }}>
+                <ThemedText style={[styles.contactLabel, { color: colors.textSecondary }]}>{item.label}</ThemedText>
+                <ThemedText style={[styles.contactValue, { color: colors.text }]}>{item.value}</ThemedText>
               </View>
+              <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
             </TouchableOpacity>
+          ))}
+        </AppCard>
 
-            <TouchableOpacity style={[styles.contactMethod, { backgroundColor: colors.inputBg }]} onPress={handleEmail}>
-              <View style={[styles.contactIcon, { backgroundColor: colors.tint }]}>
-                <ThemedText style={styles.contactEmoji}>📧</ThemedText>
-              </View>
-              <View style={styles.contactInfo}>
-                <ThemedText style={[styles.contactLabel, { color: colors.textSecondary }]}>Email</ThemedText>
-                <ThemedText style={[styles.contactValue, { color: colors.text }]}>fusioncraft.gmail.com</ThemedText>
-              </View>
-            </TouchableOpacity>
+        <PrimaryButton title="Send a support ticket" onPress={() => router.push('/profile/support' as any)} />
+        <View style={{ height: 18 }} />
 
-            <TouchableOpacity style={[styles.contactMethod, { backgroundColor: colors.inputBg }]} onPress={handleWhatsApp}>
-              <View style={[styles.contactIcon, { backgroundColor: '#25D366' }]}>
-                <ThemedText style={styles.contactEmoji}>💬</ThemedText>
-              </View>
-              <View style={styles.contactInfo}>
-                <ThemedText style={[styles.contactLabel, { color: colors.textSecondary }]}>WhatsApp</ThemedText>
-                <ThemedText style={[styles.contactValue, { color: colors.text }]}>+91 9360121830</ThemedText>
-              </View>
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* FAQ Section */}
-        <ThemedText style={[styles.sectionTitle, { color: colors.text }]}>Frequently Asked Questions</ThemedText>
-        
-        <View style={[styles.faqCard, { backgroundColor: colors.card }]}>
+        <SectionHeading title="Frequently asked questions" />
+        <AppCard style={{ marginBottom: 18 }}>
           {faqItems.map((faq, index) => (
-            <View key={faq.id}>
-              <View style={styles.faqItem}>
-                <ThemedText style={[styles.faqQuestion, { color: colors.text }]}>{faq.question}</ThemedText>
-                <ThemedText style={[styles.faqAnswer, { color: colors.textSecondary }]}>{faq.answer}</ThemedText>
-              </View>
-              {index < faqItems.length - 1 && <View style={[styles.divider, { backgroundColor: colors.border }]} />}
+            <View key={faq.id} style={[styles.faqItem, index < faqItems.length - 1 && { borderBottomWidth: 1, borderBottomColor: colors.border }]}>
+              <ThemedText style={[styles.faqQuestion, { color: colors.text }]}>{faq.question}</ThemedText>
+              <ThemedText style={[styles.faqAnswer, { color: colors.textSecondary }]}>{faq.answer}</ThemedText>
             </View>
           ))}
-        </View>
+        </AppCard>
 
-        {/* Support Hours */}
-        <View style={[styles.hoursCard, { backgroundColor: colors.card }]}>
-          <ThemedText style={[styles.hoursTitle, { color: colors.text }]}>Support Hours</ThemedText>
-          <View style={styles.hoursRow}>
-            <ThemedText style={[styles.hoursDay, { color: colors.text }]}>Monday - Friday</ThemedText>
-            <ThemedText style={[styles.hoursTime, { color: colors.tint }]}>9:00 AM - 6:00 PM</ThemedText>
-          </View>
-          <View style={styles.hoursRow}>
-            <ThemedText style={[styles.hoursDay, { color: colors.text }]}>Saturday</ThemedText>
-            <ThemedText style={[styles.hoursTime, { color: colors.tint }]}>10:00 AM - 4:00 PM</ThemedText>
-          </View>
-          <View style={styles.hoursRow}>
-            <ThemedText style={[styles.hoursDay, { color: colors.text }]}>Sunday</ThemedText>
-            <ThemedText style={[styles.hoursTime, { color: colors.tint }]}>Closed</ThemedText>
-          </View>
-        </View>
-      </ScrollView>
-    </View>
+        <AppCard>
+          <ThemedText style={[styles.hoursTitle, { color: colors.text }]}>Support hours</ThemedText>
+          <ThemedText style={{ color: colors.textSecondary, lineHeight: 22 }}>{contact.hours}</ThemedText>
+          {contact.address ? (
+            <ThemedText style={{ color: colors.textSecondary, marginTop: 8 }}>{contact.address}</ThemedText>
+          ) : null}
+        </AppCard>
+      </ScreenScroll>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  statusBarSpace: {
-    height: STATUSBAR_HEIGHT,
-    backgroundColor: 'transparent',
-  },
-  header: {
+  contactRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
+    borderRadius: 14,
+    padding: 12,
+    marginBottom: 10,
+    gap: 12,
   },
-  backButton: {
+  contactIcon: {
     width: 40,
     height: 40,
     borderRadius: 12,
+    alignItems: 'center',
     justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
   },
-  backIcon: {
-    fontSize: 20,
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-  },
-  placeholder: {
-    width: 40,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingHorizontal: 20,
-    paddingBottom: 30,
-  },
-  contactCard: {
-    borderRadius: 20,
-    padding: 20,
-    marginBottom: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 5,
-  },
-  contactTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    marginBottom: 4,
-  },
-  contactSubtitle: {
-    fontSize: 14,
-    marginBottom: 20,
-  },
-  contactMethods: {
-    gap: 12,
-  },
-  contactMethod: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: 12,
-    padding: 14,
-  },
-  contactIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 14,
-  },
-  contactEmoji: {
-    fontSize: 20,
-  },
-  contactInfo: {
-    flex: 1,
-  },
-  contactLabel: {
-    fontSize: 12,
-    marginBottom: 2,
-  },
-  contactValue: {
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    marginBottom: 12,
-  },
-  faqCard: {
-    borderRadius: 16,
-    overflow: 'hidden',
-    marginBottom: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  faqItem: {
-    padding: 16,
-  },
-  faqQuestion: {
-    fontSize: 15,
-    fontWeight: '600',
-    marginBottom: 8,
-  },
-  faqAnswer: {
-    fontSize: 14,
-    lineHeight: 20,
-  },
-  divider: {
-    height: 1,
-  },
-  hoursCard: {
-    borderRadius: 16,
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  hoursTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    marginBottom: 12,
-  },
-  hoursRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: 8,
-  },
-  hoursDay: {
-    fontSize: 14,
-  },
-  hoursTime: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
+  contactLabel: { fontSize: 12, marginBottom: 2 },
+  contactValue: { fontSize: 15, fontWeight: '700' },
+  faqItem: { paddingVertical: 12 },
+  faqQuestion: { fontSize: 15, fontWeight: '700', marginBottom: 6 },
+  faqAnswer: { fontSize: 14, lineHeight: 20 },
+  hoursTitle: { fontSize: 16, fontWeight: '800', marginBottom: 12 },
 });

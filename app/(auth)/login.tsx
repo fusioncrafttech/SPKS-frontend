@@ -1,20 +1,23 @@
 import { Link, router } from 'expo-router';
 import { useState } from 'react';
 import {
-    Alert,
-    Keyboard,
-    KeyboardAvoidingView,
-    Modal,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    TouchableOpacity,
-    TouchableWithoutFeedback,
-    View,
+  Alert,
+  Keyboard,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  StyleSheet,
+  TouchableOpacity,
+  TouchableWithoutFeedback,
+  View,
 } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
+import { HeroBanner } from '@/components/ui/hero-banner';
+import { PrimaryButton } from '@/components/ui/primary-button';
+import { Screen, ScreenScroll } from '@/components/ui/screen';
 import { TextInput } from '@/components/ui/text-input';
+import { Brand } from '@/constants/brand';
 import { useAuth } from '@/contexts/auth-context';
 import { useTheme } from '@/contexts/theme-context';
 import { forgotPassword } from '@/lib/auth';
@@ -71,32 +74,25 @@ export default function LoginScreen() {
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <Screen>
       <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
         <KeyboardAvoidingView behavior="padding" style={styles.keyboardView} keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}>
-          <ScrollView
-            contentContainerStyle={styles.scrollContent}
-            keyboardShouldPersistTaps="handled"
-            showsVerticalScrollIndicator={false}
-            keyboardDismissMode="on-drag"
-            bounces={false}
-          >
-            <View style={styles.header}>
-              <ThemedText type="title" style={[styles.title, { color: colors.text }]}>Welcome Back</ThemedText>
-              <ThemedText style={[styles.subtitle, { color: colors.textSecondary }]}>Sign in to continue</ThemedText>
-            </View>
-
+          <ScreenScroll keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" bounces={false} contentStyle={styles.scroll}>
+            <HeroBanner
+              icon="school"
+              eyebrow="SPKS"
+              title="Welcome back"
+              subtitle="Sign in to continue your exam preparation"
+              gradient={Brand.indigo}
+            />
             <View style={[styles.formCard, { backgroundColor: colors.card }]}>
               <TextInput label="Email" placeholder="Enter your email" value={email} onChangeText={setEmail} error={errors.email} autoCapitalize="none" autoCorrect={false} keyboardType="email-address" />
               <TextInput label="Password" placeholder="Enter your password" value={password} onChangeText={setPassword} error={errors.password} secureTextEntry autoCapitalize="none" autoCorrect={false} />
               <TouchableOpacity onPress={() => { setResetEmail(email); setShowForgot(true); }} style={styles.forgotLink}>
                 <ThemedText style={[styles.linkText, { color: colors.tint }]}>Forgot password?</ThemedText>
               </TouchableOpacity>
-              <TouchableOpacity style={[styles.button, { backgroundColor: colors.tint }]} onPress={handleLogin} disabled={isLoading} activeOpacity={0.8}>
-                <ThemedText style={styles.buttonText}>{isLoading ? 'Signing in...' : 'Login'}</ThemedText>
-              </TouchableOpacity>
+              <PrimaryButton title={isLoading ? 'Signing in...' : 'Login'} onPress={handleLogin} disabled={isLoading} />
             </View>
-
             <View style={styles.footer}>
               <ThemedText style={[styles.footerText, { color: colors.textSecondary }]}>Don't have an account? </ThemedText>
               <Link href="/(auth)/register" asChild>
@@ -105,7 +101,7 @@ export default function LoginScreen() {
                 </TouchableOpacity>
               </Link>
             </View>
-          </ScrollView>
+          </ScreenScroll>
         </KeyboardAvoidingView>
       </TouchableWithoutFeedback>
 
@@ -115,36 +111,28 @@ export default function LoginScreen() {
             <ThemedText style={[styles.modalTitle, { color: colors.text }]}>Reset password</ThemedText>
             <ThemedText style={[styles.modalHint, { color: colors.textSecondary }]}>Enter the email used to register your account.</ThemedText>
             <TextInput label="Email" placeholder="Enter your email" value={resetEmail} onChangeText={setResetEmail} autoCapitalize="none" keyboardType="email-address" />
-            <TouchableOpacity style={[styles.button, { backgroundColor: colors.tint }]} onPress={handleForgotPassword} disabled={isResetting}>
-              <ThemedText style={styles.buttonText}>{isResetting ? 'Sending...' : 'Send reset link'}</ThemedText>
-            </TouchableOpacity>
+            <PrimaryButton title={isResetting ? 'Sending...' : 'Send reset link'} onPress={handleForgotPassword} disabled={isResetting} />
             <TouchableOpacity onPress={() => setShowForgot(false)} style={styles.cancelButton}>
               <ThemedText style={[styles.linkText, { color: colors.textSecondary }]}>Cancel</ThemedText>
             </TouchableOpacity>
           </View>
         </View>
       </Modal>
-    </View>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
   keyboardView: { flex: 1 },
-  scrollContent: { flexGrow: 1, justifyContent: 'center', paddingHorizontal: 24, paddingTop: 40, paddingBottom: 320 },
-  header: { alignItems: 'center', marginBottom: 32 },
-  title: { marginBottom: 8 },
-  subtitle: { fontSize: 16 },
-  formCard: { borderRadius: 16, padding: 24, marginBottom: 24, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 3 },
-  forgotLink: { alignSelf: 'flex-end', marginBottom: 8 },
-  button: { height: 50, borderRadius: 12, justifyContent: 'center', alignItems: 'center', marginTop: 8 },
-  buttonText: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  scroll: { paddingTop: 12, flexGrow: 1, justifyContent: 'center' },
+  formCard: { borderRadius: 22, padding: 20, marginBottom: 20 },
+  forgotLink: { alignSelf: 'flex-end', marginBottom: 12 },
   footer: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center' },
   footerText: { fontSize: 14 },
-  linkText: { fontSize: 14, fontWeight: '600' },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-  modalCard: { borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 40 },
-  modalTitle: { fontSize: 18, fontWeight: '700', marginBottom: 8 },
+  linkText: { fontSize: 14, fontWeight: '700' },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(15,23,42,0.45)', justifyContent: 'flex-end' },
+  modalCard: { borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24, paddingBottom: 40 },
+  modalTitle: { fontSize: 20, fontWeight: '800', marginBottom: 8 },
   modalHint: { fontSize: 14, marginBottom: 16 },
   cancelButton: { alignItems: 'center', marginTop: 16 },
 });

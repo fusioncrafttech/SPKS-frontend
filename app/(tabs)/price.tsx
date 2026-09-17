@@ -1,34 +1,43 @@
-import { StyleSheet, View, ScrollView, TouchableOpacity, StatusBar, Platform, Alert } from 'react-native';
-import { useEffect, useState } from 'react';
+import Ionicons from '@expo/vector-icons/Ionicons';
+import { router } from 'expo-router';
+import { useEffect, useMemo, useState } from 'react';
+import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
-import { useTheme } from '@/contexts/theme-context';
 import { ThemedText } from '@/components/themed-text';
+import { Screen, ScreenScroll } from '@/components/ui/screen';
+import { useTheme } from '@/contexts/theme-context';
 import { api, asList } from '@/lib/api';
-
-const STATUSBAR_HEIGHT = Platform.OS === 'ios' ? 44 : StatusBar.currentHeight || 24;
+import { createPaymentOrder, getCurrentSubscription, type Subscription } from '@/lib/payments';
 
 type Plan = {
   id: string;
   name: string;
-  price: string;
-  period: string;
+  amount: number;
+  currency: string;
+  durationDays: number;
   features: string[];
-  color: string;
-  popular: boolean;
 };
 
-function formatPrice(value: unknown, currency = 'INR') {
-  const amount = Number(value);
-  if (Number.isNaN(amount)) return String(value || '₹0');
-  if (currency === 'INR' || currency === '₹') return `₹${amount}`;
-  return `${currency} ${amount}`;
+function formatAmount(value: number) {
+  return value.toLocaleString('en-IN');
 }
 
-function formatPeriod(duration: unknown) {
-  if (!duration) return '/month';
-  const text = String(duration);
-  if (text.includes('/')) return text;
-  return `/${text}`;
+function periodCopy(plan: Plan) {
+  if (plan.amount === 0 || plan.durationDays === 0) {
+    return { line: 'Free forever', hint: 'No payment needed' };
+  }
+  if (plan.durationDays <= 31) {
+    return { line: 'per month', hint: 'Billed every 30 days' };
+  }
+  if (plan.durationDays >= 300) {
+    const monthly = Math.round(plan.amount / 12);
+    return { line: 'per year', hint: `About ₹${formatAmount(monthly)} per month` };
+  }
+  return { line: `for ${plan.durationDays} days`, hint: 'One-time access' };
+}
+
+function isMonthly(plan: Plan) {
+  return plan.durationDays > 0 && plan.durationDays <= 31;
 }
 
 function parseFeatures(value: unknown): string[] {
@@ -44,207 +53,366 @@ function parseFeatures(value: unknown): string[] {
   return [];
 }
 
-export default function PriceScreen() {
-  const { colors } = useTheme();
+const FALLBACK_PLANS: Plan[] = [
+  { id: '1', name: 'Free', amount: 0, currency: 'INR', durationDays: 0, features: ['Limited tests', 'Daily current affairs'] },
+  { id: '2', name: 'Monthly', amount: 299, currency: 'INR', durationDays: 30, features: ['All courses', 'Unlimited tests', 'Premium notes'] },
+  { id: '3', name: 'Yearly', amount: 2499, currency: 'INR', durationDays: 365, features: ['All courses', 'Unlimited tests', 'Premium notes', 'Priority support'] },
+];
 
-  const fallbackPlans: Plan[] = [
-    { id: '1', name: 'Basic', price: '₹199', period: '/month', features: ['Access to 2 courses', 'Daily quizzes', 'Basic support', 'Progress tracking'], color: colors.tint, popular: false },
-    { id: '2', name: 'Pro', price: '₹499', period: '/month', features: ['Access to all courses', 'Unlimited quizzes', 'Priority support', 'Detailed analytics', 'Offline access'], color: colors.gradient2[0], popular: true },
-    { id: '3', name: 'Premium', price: '₹999', period: '/month', features: ['Everything in Pro', 'One-on-one mentoring', 'Mock interviews', 'Certificate', 'Lifetime access'], color: colors.success, popular: false },
-  ];
-  const [pricingPlans, setPricingPlans] = useState(fallbackPlans);
+export default function PriceScreen() {
+  const { colors, isDark } = useTheme();
+  const [pricingPlans, setPricingPlans] = useState(FALLBACK_PLANS);
+  const [selectedId, setSelectedId] = useState(FALLBACK_PLANS[1].id);
+  const [subscription, setSubscription] = useState<Subscription | null>(null);
+  const [paying, setPaying] = useState(false);
 
   useEffect(() => {
     api.get<Record<string, any>[]>('/api/plans')
       .then((items) => {
         const list = asList(items);
         if (!list.length) return;
-        setPricingPlans(list.map((plan, index) => ({
+        const next = list.map((plan) => ({
           id: String(plan.id),
           name: plan.name || 'Plan',
-          price: formatPrice(plan.price, plan.currency),
-          period: formatPeriod(plan.duration),
+          amount: Number(plan.price) || 0,
+          currency: String(plan.currency || 'INR'),
+          durationDays: Number(plan.duration) || 0,
           features: parseFeatures(plan.features).length ? parseFeatures(plan.features) : ['Course access'],
-          color: index === 1 ? colors.gradient2[0] : index === 2 ? colors.success : colors.tint,
-          popular: Boolean(plan.popular || index === 1),
-        })));
+        }));
+        setPricingPlans(next);
+        const monthly = next.find(isMonthly);
+        setSelectedId(monthly?.id || next[0]?.id);
       })
       .catch(() => undefined);
-  }, [colors]);
+    getCurrentSubscription().then(setSubscription);
+  }, []);
+
+  const selected = useMemo(
+    () => pricingPlans.find((plan) => plan.id === selectedId) || pricingPlans[0],
+    [pricingPlans, selectedId]
+  );
 
   const handleGetStarted = async (plan: Plan) => {
+    if (plan.amount === 0) {
+      Alert.alert('Free plan', 'You already have access to the free plan.');
+      return;
+    }
+    setPaying(true);
     try {
-      await api.post('/api/payments/create-order', { planId: plan.id });
-      Alert.alert('Order created', `Continue checkout for ${plan.name}.`);
+      const order = await createPaymentOrder(plan.id);
+      const keyId = order.keyId || process.env.EXPO_PUBLIC_RAZORPAY_KEY_ID || '';
+      if (!keyId || !order.razorpayOrderId) {
+        Alert.alert('Payment', 'Checkout is not configured yet. The order was created on the server.');
+        return;
+      }
+      const amount = order.amount > 0 && order.amount < 5000 ? Math.round(order.amount * 100) : order.amount;
+      router.push({
+        pathname: '/checkout',
+        params: {
+          keyId,
+          orderId: order.razorpayOrderId,
+          amount: String(amount),
+          currency: order.currency || 'INR',
+          name: plan.name,
+        },
+      } as any);
     } catch (error) {
       Alert.alert('Payment', error instanceof Error ? error.message : 'Payment is not available yet.');
+    } finally {
+      setPaying(false);
     }
   };
 
+  const ctaLabel = selected?.amount === 0
+    ? 'Continue with Free'
+    : `Continue · ₹${formatAmount(selected?.amount || 0)}`;
+
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <StatusBar barStyle={colors.statusBar} backgroundColor="transparent" translucent />
-      <View style={styles.statusBarSpace} />
-      
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Header */}
-        <View style={styles.header}>
-          <ThemedText style={[styles.headerTitle, { color: colors.text }]}>Choose Your Plan</ThemedText>
-          <ThemedText style={[styles.headerSubtitle, { color: colors.textSecondary }]}>
-            Select the perfect plan for your preparation journey
-          </ThemedText>
-        </View>
+    <Screen>
+      <ScreenScroll contentStyle={{ paddingTop: 8 }}>
+        <ThemedText style={[styles.kicker, { color: colors.textSecondary }]}>Membership</ThemedText>
+        <ThemedText style={[styles.pageTitle, { color: colors.text }]}>Pick a plan</ThemedText>
+        <ThemedText style={[styles.pageHint, { color: colors.textSecondary }]}>
+          Monthly billing, or save more with a yearly plan
+        </ThemedText>
 
-        {/* Pricing Cards */}
-        {pricingPlans.map((plan) => (
-          <View key={plan.id} style={[styles.card, { backgroundColor: colors.card }, plan.popular && styles.popularCard]}>
-            {plan.popular && (
-              <View style={[styles.popularBadge, { backgroundColor: colors.tint }]}>
-                <ThemedText style={styles.popularText}>Most Popular</ThemedText>
+        {subscription?.planName || subscription?.name ? (
+          <View style={[styles.currentPlan, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <ThemedText style={[styles.currentLabel, { color: colors.textSecondary }]}>You are on</ThemedText>
+            <ThemedText style={[styles.currentName, { color: colors.text }]}>
+              {subscription.planName || subscription.name}
+            </ThemedText>
+          </View>
+        ) : null}
+
+        {pricingPlans.map((plan) => {
+          const selectedPlan = plan.id === selectedId;
+          const copy = periodCopy(plan);
+          const highlight = isMonthly(plan);
+
+          return (
+            <TouchableOpacity
+              key={plan.id}
+              style={[
+                styles.planCard,
+                {
+                  borderColor: selectedPlan ? '#4338CA' : colors.border,
+                  backgroundColor: selectedPlan
+                    ? isDark
+                      ? '#1E1B4B'
+                      : '#E0E7FF'
+                    : colors.card,
+                },
+              ]}
+              onPress={() => setSelectedId(plan.id)}
+              activeOpacity={0.9}
+            >
+              <View style={styles.planTop}>
+                <View style={styles.planIdentity}>
+                  <View
+                    style={[
+                      styles.radio,
+                      {
+                        borderColor: selectedPlan ? '#4338CA' : colors.textMuted,
+                        backgroundColor: selectedPlan ? '#4338CA' : 'transparent',
+                      },
+                    ]}
+                  >
+                    {selectedPlan ? <View style={styles.radioDot} /> : null}
+                  </View>
+                  <ThemedText style={[styles.planName, { color: selectedPlan && isDark ? '#FFFFFF' : colors.text }]}>
+                    {plan.name}
+                  </ThemedText>
+                </View>
+                {highlight ? (
+                  <View style={styles.bestChip}>
+                    <ThemedText style={styles.bestChipText}>Best value</ThemedText>
+                  </View>
+                ) : null}
               </View>
-            )}
-            
-            <ThemedText style={[styles.planName, { color: plan.color }]}>{plan.name}</ThemedText>
-            
-            <View style={styles.priceRow}>
-              <ThemedText style={[styles.price, { color: colors.text }]}>{plan.price}</ThemedText>
-              <ThemedText style={[styles.period, { color: colors.textSecondary }]}>{plan.period}</ThemedText>
-            </View>
 
-            <View style={styles.featuresContainer}>
-              {plan.features.map((feature, index) => (
-                <View key={index} style={styles.featureRow}>
-                  <ThemedText style={[styles.checkmark, { color: plan.color }]}>✓</ThemedText>
-                  <ThemedText style={[styles.featureText, { color: colors.text }]}>{feature}</ThemedText>
+              <View style={styles.priceBlock}>
+                {plan.amount === 0 ? (
+                  <Text style={[styles.freeLabel, { color: selectedPlan && isDark ? '#FFFFFF' : colors.text }]}>
+                    Free
+                  </Text>
+                ) : (
+                  <View style={styles.amountRow}>
+                    <Text style={[styles.currency, { color: selectedPlan && isDark ? '#C7D2FE' : colors.textSecondary }]}>
+                      ₹
+                    </Text>
+                    <Text
+                      style={[styles.amount, { color: selectedPlan && isDark ? '#FFFFFF' : colors.text }]}
+                      numberOfLines={1}
+                    >
+                      {formatAmount(plan.amount)}
+                    </Text>
+                  </View>
+                )}
+                <Text style={[styles.period, { color: selectedPlan && isDark ? '#C7D2FE' : colors.textSecondary }]}>
+                  {copy.line}
+                </Text>
+                <Text style={[styles.periodHint, { color: selectedPlan && isDark ? '#A5B4FC' : colors.textMuted }]}>
+                  {copy.hint}
+                </Text>
+              </View>
+
+              {plan.features.map((feature) => (
+                <View key={feature} style={styles.featureRow}>
+                  <Ionicons name="checkmark-circle" size={16} color={selectedPlan ? '#4338CA' : colors.tint} />
+                  <ThemedText style={[styles.featureText, { color: selectedPlan && isDark ? '#E0E7FF' : colors.text }]}>
+                    {feature}
+                  </ThemedText>
                 </View>
               ))}
-            </View>
-
-            <TouchableOpacity 
-              style={[styles.button, { backgroundColor: plan.color }]}
-              activeOpacity={0.8}
-              onPress={() => handleGetStarted(plan)}
-            >
-              <ThemedText style={styles.buttonText}>Get Started</ThemedText>
             </TouchableOpacity>
-          </View>
-        ))}
-      </ScrollView>
-    </View>
+          );
+        })}
+
+        <TouchableOpacity
+          style={styles.cta}
+          onPress={() => selected && handleGetStarted(selected)}
+          activeOpacity={0.88}
+          disabled={paying}
+        >
+          <ThemedText style={styles.ctaText}>{paying ? 'Opening checkout...' : ctaLabel}</ThemedText>
+          <Ionicons name="arrow-forward" size={16} color="#FFFFFF" />
+        </TouchableOpacity>
+
+        <TouchableOpacity onPress={() => router.push('/profile/payments' as any)} style={{ alignItems: 'center', marginTop: 16 }}>
+          <ThemedText style={{ color: colors.tint, fontWeight: '700' }}>View payment history</ThemedText>
+        </TouchableOpacity>
+
+        <View style={styles.perkRow}>
+          <ThemedText style={[styles.perk, { color: colors.textMuted }]}>Secure payment</ThemedText>
+          <ThemedText style={[styles.perkDot, { color: colors.textMuted }]}>·</ThemedText>
+          <ThemedText style={[styles.perk, { color: colors.textMuted }]}>Cancel anytime</ThemedText>
+        </View>
+      </ScreenScroll>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  statusBarSpace: {
-    height: STATUSBAR_HEIGHT,
-    backgroundColor: 'transparent',
-  },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 30,
-  },
-  header: {
-    marginBottom: 24,
-    alignItems: 'center',
-  },
-  headerTitle: {
-    fontSize: 26,
-    fontWeight: '700',
-    color: '#1a1a2e',
-    marginBottom: 8,
-  },
-  headerSubtitle: {
-    fontSize: 14,
-    color: '#8e8e93',
-    textAlign: 'center',
-  },
-  card: {
-    borderRadius: 20,
-    padding: 24,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 5,
-  },
-  popularCard: {
-    borderWidth: 2,
-    borderColor: '#f5576c',
-  },
-  popularBadge: {
-    position: 'absolute',
-    top: -12,
-    right: 20,
-    backgroundColor: '#f5576c',
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  popularText: {
-    color: '#fff',
+  kicker: {
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: '700',
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+    marginBottom: 6,
+  },
+  pageTitle: {
+    fontSize: 26,
+    lineHeight: 32,
+    fontWeight: '800',
+    letterSpacing: -0.4,
+    marginBottom: 6,
+  },
+  pageHint: {
+    fontSize: 14,
+    lineHeight: 20,
+    marginBottom: 18,
+  },
+  currentPlan: {
+    borderWidth: 1,
+    borderRadius: 16,
+    padding: 14,
+    marginBottom: 16,
+  },
+  currentLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    marginBottom: 2,
+  },
+  currentName: {
+    fontSize: 18,
+    fontWeight: '800',
+  },
+  planCard: {
+    borderRadius: 22,
+    padding: 18,
+    marginBottom: 12,
+    borderWidth: 2,
+  },
+  planTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  planIdentity: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flex: 1,
+  },
+  radio: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  radioDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#FFFFFF',
   },
   planName: {
-    fontSize: 20,
-    fontWeight: '700',
-    marginBottom: 8,
+    fontSize: 16,
+    fontWeight: '800',
   },
-  priceRow: {
+  bestChip: {
+    backgroundColor: '#4338CA',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+  },
+  bestChipText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  priceBlock: {
+    marginBottom: 12,
+    paddingLeft: 32,
+  },
+  amountRow: {
     flexDirection: 'row',
-    alignItems: 'baseline',
-    marginBottom: 20,
+    alignItems: 'flex-end',
   },
-  price: {
-    fontSize: 36,
+  currency: {
+    fontSize: 20,
+    lineHeight: 34,
     fontWeight: '700',
-    color: '#1a1a2e',
+    marginRight: 4,
+    includeFontPadding: false,
+  },
+  amount: {
+    fontSize: 34,
+    lineHeight: 40,
+    fontWeight: '800',
+    letterSpacing: -0.8,
+    includeFontPadding: false,
+  },
+  freeLabel: {
+    fontSize: 34,
+    lineHeight: 40,
+    fontWeight: '800',
+    letterSpacing: -0.8,
+    includeFontPadding: false,
   },
   period: {
     fontSize: 14,
-    color: '#8e8e93',
-    marginLeft: 4,
+    lineHeight: 20,
+    fontWeight: '700',
+    marginTop: 2,
   },
-  featuresContainer: {
-    marginBottom: 20,
+  periodHint: {
+    fontSize: 12,
+    lineHeight: 16,
+    marginTop: 2,
   },
   featureRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
-  },
-  checkmark: {
-    fontSize: 16,
-    fontWeight: '700',
-    marginRight: 12,
+    gap: 8,
+    paddingLeft: 32,
+    marginBottom: 6,
   },
   featureText: {
-    fontSize: 14,
-    color: '#1a1a2e',
-  },
-  button: {
-    paddingVertical: 14,
-    borderRadius: 12,
-    alignItems: 'center',
-  },
-  buttonText: {
-    color: '#fff',
-    fontSize: 16,
+    fontSize: 13,
     fontWeight: '600',
+  },
+  cta: {
+    marginTop: 8,
+    height: 52,
+    borderRadius: 16,
+    backgroundColor: '#4338CA',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  ctaText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '800',
+  },
+  perkRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 14,
+  },
+  perk: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  perkDot: {
+    fontSize: 12,
   },
 });

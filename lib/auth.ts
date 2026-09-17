@@ -123,3 +123,17 @@ export async function uploadProfileImage(file: { uri: string; name?: string; typ
   await persistUser(user);
   return user;
 }
+
+export async function deleteProfileImage() {
+  const user = await api.delete<AuthUser>('/api/users/me/profile-image');
+  await persistUser(user);
+  return user;
+}
+
+export async function changePassword(input: { currentPassword: string; newPassword: string }) {
+  return api.post('/api/auth/change-password', input);
+}
+
+export async function resetPassword(input: { token: string; password: string }) {
+  return api.post('/api/auth/reset-password', input);
+}

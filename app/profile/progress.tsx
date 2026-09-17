@@ -1,23 +1,24 @@
-import { router } from 'expo-router';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { useEffect, useState } from 'react';
 import {
     FlatList,
     Modal,
-    Platform,
-    ScrollView,
-    StatusBar,
     StyleSheet,
     TouchableOpacity,
     View,
 } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
+import { HeroBanner } from '@/components/ui/hero-banner';
+import { PageHeader } from '@/components/ui/page-header';
+import { Screen, ScreenScroll } from '@/components/ui/screen';
+import { SectionHeading } from '@/components/ui/section-heading';
+import { Brand } from '@/constants/brand';
 import { useAuth } from '@/contexts/auth-context';
 import { useTheme } from '@/contexts/theme-context';
 import { api, asList } from '@/lib/api';
 import { updateProfile } from '@/lib/auth';
-
-const STATUSBAR_HEIGHT = Platform.OS === 'ios' ? 44 : StatusBar.currentHeight || 24;
+import { getActivity, getStreak } from '@/lib/study';
 
 const INDIAN_STATES = [
   'Andhra Pradesh', 'Arunachal Pradesh', 'Assam', 'Bihar', 'Chhattisgarh',
@@ -31,13 +32,14 @@ export default function ProgressScreen() {
   const { colors } = useTheme();
   const { user, setUser } = useAuth();
   const fallbackProgress = [
-    { id: '1', course: 'TNPSC', completed: 0, total: 1, color: colors.gradient1[0] },
-    { id: '2', course: 'RRB', completed: 0, total: 1, color: colors.gradient2[0] },
-    { id: '3', course: 'TNUSRB', completed: 0, total: 1, color: colors.gradient3[0] },
-    { id: '4', course: 'Current Affairs', completed: 0, total: 1, color: colors.gradient4[0] },
+    { id: '1', course: 'TNPSC', completed: 0, total: 1, color: Brand.indigoSoft[0] },
+    { id: '2', course: 'RRB', completed: 0, total: 1, color: Brand.teal[0] },
+    { id: '3', course: 'TNUSRB', completed: 0, total: 1, color: Brand.blue[0] },
+    { id: '4', course: 'Current Affairs', completed: 0, total: 1, color: Brand.orange[0] },
   ];
   const [progressData, setProgressData] = useState(fallbackProgress);
   const [stats, setStats] = useState({ testsCompleted: 0, averageScore: 0, dailyStreak: 0 });
+  const [activity, setActivity] = useState<Record<string, any>[]>([]);
   const [selectedState, setSelectedState] = useState(user?.state || 'Tamil Nadu');
   const [showStateModal, setShowStateModal] = useState(false);
 
@@ -51,7 +53,7 @@ export default function ProgressScreen() {
           course: item.course || item.courseName || item.name || 'Course',
           completed: Number(item.completed ?? item.completedLessons ?? item.correctCount ?? 0),
           total: Number(item.total ?? item.totalLessons ?? item.totalQuestions ?? 1) || 1,
-          color: colors.gradient1[index % colors.gradient1.length],
+          color: [Brand.indigoSoft[0], Brand.teal[0], Brand.blue[0], Brand.orange[0]][index % 4],
         })));
       })
       .catch(() => undefined);
@@ -66,11 +68,25 @@ export default function ProgressScreen() {
         });
       })
       .catch(() => undefined);
-  }, [colors, user?.id]);
 
-  const handleBack = () => {
-    router.back();
-  };
+    api.get<Record<string, any>>('/api/users/me/progress')
+      .then((data) => {
+        if (!data) return;
+        if (data.testsCompleted || data.averageScore || data.dailyStreak) {
+          setStats((current) => ({
+            testsCompleted: Number(data.testsCompleted ?? current.testsCompleted),
+            averageScore: Math.round(Number(data.averageScore ?? current.averageScore)),
+            dailyStreak: Number(data.dailyStreak ?? current.dailyStreak),
+          }));
+        }
+      })
+      .catch(() => undefined);
+
+    getStreak().then((streak) => {
+      if (streak) setStats((current) => ({ ...current, dailyStreak: streak }));
+    });
+    getActivity().then(setActivity);
+  }, [colors, user?.id]);
 
   const selectState = async (state: string) => {
     setSelectedState(state);
@@ -88,24 +104,9 @@ export default function ProgressScreen() {
   const overallProgress = Math.round((totalCompleted / totalQuestions) * 100);
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <StatusBar barStyle={colors.statusBar} backgroundColor="transparent" translucent />
-      <View style={styles.statusBarSpace} />
-
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={handleBack} style={[styles.backButton, { backgroundColor: colors.card }]}>
-          <ThemedText style={[styles.backIcon, { color: colors.text }]}>←</ThemedText>
-        </TouchableOpacity>
-        <ThemedText style={[styles.headerTitle, { color: colors.text }]}>My Progress</ThemedText>
-        <View style={styles.placeholder} />
-      </View>
-
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
+    <Screen>
+      <PageHeader title="My Progress" />
+      <ScreenScroll>
         {/* State Dropdown */}
         <View style={styles.dropdownSection}>
           <ThemedText style={[styles.sectionLabel, { color: colors.textSecondary }]}>Select Your State</ThemedText>
@@ -115,26 +116,19 @@ export default function ProgressScreen() {
             activeOpacity={0.8}
           >
             <ThemedText style={[styles.dropdownText, { color: colors.text }]}>{selectedState}</ThemedText>
-            <ThemedText style={[styles.dropdownArrow, { color: colors.textMuted }]}>▼</ThemedText>
+            <Ionicons name="chevron-down" size={16} color={colors.textMuted} />
           </TouchableOpacity>
         </View>
 
-        {/* Overall Progress */}
-        <View style={[styles.overallCard, { backgroundColor: colors.tint }]}>
-          <View style={styles.overallHeader}>
-            <ThemedText style={styles.overallTitle}>Overall Progress</ThemedText>
-            <ThemedText style={styles.overallPercent}>{overallProgress}%</ThemedText>
-          </View>
-          <View style={styles.overallBar}>
-            <View style={[styles.overallFill, { width: `${overallProgress}%` }]} />
-          </View>
-          <ThemedText style={styles.overallSubtext}>
-            {totalCompleted} of {totalQuestions} questions completed
-          </ThemedText>
-        </View>
+        <HeroBanner
+          icon="trophy"
+          eyebrow="Progress"
+          title={`${overallProgress}% complete`}
+          subtitle={`${totalCompleted} of ${totalQuestions} questions completed`}
+          gradient={Brand.indigo}
+        />
 
-        {/* Course Progress */}
-        <ThemedText style={[styles.coursesTitle, { color: colors.text }]}>Course-wise Progress</ThemedText>
+        <SectionHeading title="Course-wise progress" />
         
         {progressData.map((item) => {
           const percent = Math.round((item.completed / item.total) * 100);
@@ -183,7 +177,23 @@ export default function ProgressScreen() {
             <ThemedText style={[styles.statLabel, { color: colors.textSecondary }]}>Day Streak</ThemedText>
           </View>
         </View>
-      </ScrollView>
+
+        {activity.length ? (
+          <>
+            <SectionHeading title="Recent activity" />
+            {activity.slice(0, 8).map((item, index) => (
+              <View key={String(item.id || index)} style={[styles.courseCard, { backgroundColor: colors.card }]}>
+                <ThemedText style={[styles.courseName, { color: colors.text }]}>
+                  {item.title || item.name || item.action || 'Activity'}
+                </ThemedText>
+                <ThemedText style={[styles.courseStats, { color: colors.textSecondary }]}>
+                  {String(item.createdAt || item.date || item.description || '')}
+                </ThemedText>
+              </View>
+            ))}
+          </>
+        ) : null}
+      </ScreenScroll>
 
       {/* State Selection Modal */}
       <Modal
@@ -197,7 +207,7 @@ export default function ProgressScreen() {
             <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
               <ThemedText style={[styles.modalTitle, { color: colors.text }]}>Select State</ThemedText>
               <TouchableOpacity onPress={() => setShowStateModal(false)}>
-                <ThemedText style={[styles.modalClose, { color: colors.textSecondary }]}>✕</ThemedText>
+                <Ionicons name="close" size={18} color={colors.textSecondary} />
               </TouchableOpacity>
             </View>
             <FlatList
@@ -230,54 +240,11 @@ export default function ProgressScreen() {
           </View>
         </View>
       </Modal>
-    </View>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  statusBarSpace: {
-    height: STATUSBAR_HEIGHT,
-    backgroundColor: 'transparent',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  backIcon: {
-    fontSize: 20,
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-  },
-  placeholder: {
-    width: 40,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingHorizontal: 20,
-    paddingBottom: 30,
-  },
   dropdownSection: {
     marginBottom: 20,
   },

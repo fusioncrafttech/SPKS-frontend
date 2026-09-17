@@ -11,57 +11,53 @@ interface ThemeContextType {
   colors: typeof lightColors | typeof darkColors;
 }
 
-// Default theme – WhatsApp-style light chat background, no strong colours
-const CHAT_BG_LIGHT = '#E5DDD5';   // WhatsApp-like warm light grey (chat bg)
-const CHAT_BG_ALT = '#D1CBC3';    // Slightly darker for gradients/cards
+const BG_LIGHT = '#EEF2FF';
+const BG_LIGHT_ALT = '#E0E7FF';
 const CARD_WHITE = '#FFFFFF';
-const TEXT_DARK = '#111B21';
-const TEXT_SECONDARY = '#667781';
-const TEXT_MUTED = '#8696A0';
-const BORDER_LIGHT = '#E9EDEF';
-const INPUT_BG = '#F0F2F5';
+const TEXT_DARK = '#1E1B4B';
+const TEXT_SECONDARY = '#6366A8';
+const TEXT_MUTED = '#8B8DB3';
+const BORDER_LIGHT = '#E0E7FF';
+const INPUT_BG = '#E8ECFF';
 
-// Dark theme neutrals
-const BG_DARK = '#0B141A';
-const CARD_DARK = '#1F2C34';
-const BORDER_DARK = '#2A3942';
+const BG_DARK = '#0B0A16';
+const CARD_DARK = '#1C1833';
+const BORDER_DARK = '#312E81';
 
-// Light theme – default like WhatsApp (light grey bg, white cards, grey text only)
 export const lightColors = {
-  background: CHAT_BG_LIGHT,
+  background: BG_LIGHT,
   card: CARD_WHITE,
   text: TEXT_DARK,
   textSecondary: TEXT_SECONDARY,
   textMuted: TEXT_MUTED,
-  tint: TEXT_DARK,
-  tintLight: TEXT_SECONDARY,
+  tint: '#4338CA',
+  tintLight: '#6366F1',
   border: BORDER_LIGHT,
   tabBar: CARD_WHITE,
   inputBg: INPUT_BG,
   danger: '#dc2626',
-  success: TEXT_SECONDARY,
+  success: '#059669',
   statusBar: 'dark-content' as const,
-  gradient1: [CHAT_BG_ALT, CHAT_BG_LIGHT] as [string, string],
-  gradient2: [CHAT_BG_LIGHT, CHAT_BG_ALT] as [string, string],
-  gradient3: [CHAT_BG_ALT, CHAT_BG_LIGHT] as [string, string],
-  gradient4: [CHAT_BG_LIGHT, CHAT_BG_ALT] as [string, string],
-  gradient5: [CHAT_BG_ALT, CHAT_BG_LIGHT] as [string, string],
+  gradient1: [BG_LIGHT_ALT, BG_LIGHT] as [string, string],
+  gradient2: [BG_LIGHT, BG_LIGHT_ALT] as [string, string],
+  gradient3: [BG_LIGHT_ALT, BG_LIGHT] as [string, string],
+  gradient4: [BG_LIGHT, BG_LIGHT_ALT] as [string, string],
+  gradient5: [BG_LIGHT_ALT, BG_LIGHT] as [string, string],
 };
 
-// Dark theme – same default style, dark grey
 export const darkColors = {
   background: BG_DARK,
   card: CARD_DARK,
-  text: '#E9EDEF',
-  textSecondary: '#8696A0',
-  textMuted: '#667781',
-  tint: '#E9EDEF',
-  tintLight: '#8696A0',
+  text: '#EEF2FF',
+  textSecondary: '#A5B4FC',
+  textMuted: '#818CF8',
+  tint: '#A5B4FC',
+  tintLight: '#C7D2FE',
   border: BORDER_DARK,
   tabBar: CARD_DARK,
-  inputBg: BORDER_DARK,
+  inputBg: '#241F42',
   danger: '#f87171',
-  success: '#8696A0',
+  success: '#34d399',
   statusBar: 'light-content' as const,
   gradient1: [CARD_DARK, BORDER_DARK] as [string, string],
   gradient2: [BORDER_DARK, CARD_DARK] as [string, string],

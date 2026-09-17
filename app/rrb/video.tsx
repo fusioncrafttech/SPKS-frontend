@@ -1,115 +1,50 @@
-import { StyleSheet, View, ScrollView, TouchableOpacity, StatusBar, Platform } from 'react-native';
-import { router } from 'expo-router';
-
-import { useTheme } from '@/contexts/theme-context';
-import { ThemedText } from '@/components/themed-text';
 import { ApiResultsModal } from '@/components/ui/api-results-modal';
+import { HeroBanner } from '@/components/ui/hero-banner';
+import { MenuRow, MenuStack } from '@/components/ui/menu-row';
+import { PageHeader } from '@/components/ui/page-header';
+import { Screen, ScreenScroll } from '@/components/ui/screen';
+import { Brand } from '@/constants/brand';
 import { useCatalogResults } from '@/hooks/use-catalog-results';
 import { loadCourseItems } from '@/lib/catalog';
 
-const STATUSBAR_HEIGHT = Platform.OS === 'ios' ? 44 : StatusBar.currentHeight || 24;
-
 const VIDEO_CATEGORIES = [
-  { id: 'mathematics', title: 'Mathematics', icon: '🔢' },
-  { id: 'reasoning', title: 'Reasoning', icon: '🧠' },
-  { id: 'general-awareness', title: 'General Awareness', icon: '📰' },
-  { id: 'science', title: 'Science', icon: '🔬' },
-  { id: 'computer', title: 'Basics of Computer', icon: '💻' },
-  { id: 'environment', title: 'Environment & Pollution', icon: '🌍' },
-  { id: 'technical', title: 'Technical Subject', icon: '⚙️' },
+  { id: 'mathematics', title: 'Mathematics', icon: 'calculator-outline' as const },
+  { id: 'reasoning', title: 'Reasoning', icon: 'bulb-outline' as const },
+  { id: 'general-awareness', title: 'General Awareness', icon: 'newspaper-outline' as const },
+  { id: 'science', title: 'Science', icon: 'flask-outline' as const },
+  { id: 'computer', title: 'Basics of Computer', icon: 'desktop-outline' as const },
+  { id: 'environment', title: 'Environment & Pollution', icon: 'leaf-outline' as const },
+  { id: 'technical', title: 'Technical Subject', icon: 'cog-outline' as const },
 ];
 
 export default function VideoScreen() {
-  const { colors } = useTheme();
   const results = useCatalogResults();
 
-  const handleBack = () => router.back();
-  const handleVideoPress = (id: string, title: string) => {
-    results.show(title, () => loadCourseItems('rrb', 'videos', { category: id, search: title }));
-  };
-
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <StatusBar barStyle={colors.statusBar} backgroundColor="transparent" translucent />
-      <View style={styles.statusBarSpace} />
-      <View style={styles.header}>
-        <TouchableOpacity onPress={handleBack} style={[styles.backButton, { backgroundColor: colors.card }]}>
-          <ThemedText style={[styles.backIcon, { color: colors.text }]}>←</ThemedText>
-        </TouchableOpacity>
-        <ThemedText style={[styles.headerTitle, { color: colors.text }]}>Video Explain</ThemedText>
-        <View style={styles.placeholder} />
-      </View>
-      <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        <View style={[styles.infoCard, { backgroundColor: colors.card }]}>
-          <ThemedText style={[styles.infoTitle, { color: colors.text }]}>RRB Video Explanations</ThemedText>
-          <ThemedText style={[styles.infoSubtitle, { color: colors.textSecondary }]}>Direct Connect YouTube - Subject-wise video tutorials</ThemedText>
-        </View>
-
-        <View style={styles.youtubeBanner}>
-          <View style={[styles.youtubeIconContainer, { backgroundColor: colors.background }]}>
-            <ThemedText style={styles.youtubeIcon}>🎥</ThemedText>
-          </View>
-          <View style={styles.youtubeContent}>
-            <ThemedText style={[styles.youtubeTitle, { color: colors.text }]}>Direct Connect YouTube</ThemedText>
-            <ThemedText style={[styles.youtubeSubtitle, { color: colors.textSecondary }]}>Comprehensive video explanations for all subjects</ThemedText>
-          </View>
-        </View>
-
-        <View style={styles.sectionHeader}>
-          <ThemedText style={[styles.sectionTitle, { color: colors.text }]}>Select Subject</ThemedText>
-        </View>
-        <View style={styles.menuContainer}>
-          {VIDEO_CATEGORIES.map((item) => (
-            <TouchableOpacity
+    <Screen>
+      <PageHeader title="Video Explain" />
+      <ScreenScroll>
+        <HeroBanner
+          icon="play-circle"
+          eyebrow="YouTube"
+          title="RRB video explanations"
+          subtitle="Subject-wise tutorials connected directly to YouTube"
+          gradient={Brand.teal}
+        />
+        <MenuStack>
+          {VIDEO_CATEGORIES.map((item, index) => (
+            <MenuRow
               key={item.id}
-              style={[styles.menuCard, { backgroundColor: colors.card }]}
-              onPress={() => handleVideoPress(item.id, item.title)}
-              activeOpacity={0.7}
-            >
-              <View style={[styles.menuIconContainer, { backgroundColor: colors.background }]}>
-                <ThemedText style={styles.menuIcon}>{item.icon}</ThemedText>
-              </View>
-              <View style={styles.menuTextContainer}>
-                <ThemedText style={[styles.menuTitle, { color: colors.text }]}>{item.title}</ThemedText>
-                <ThemedText style={[styles.menuSubtitle, { color: colors.textSecondary }]}>Video tutorials available</ThemedText>
-              </View>
-              <ThemedText style={[styles.menuArrow, { color: colors.textMuted }]}>›</ThemedText>
-            </TouchableOpacity>
+              title={item.title}
+              subtitle="Video tutorials available"
+              icon={item.icon}
+              index={index}
+              onPress={() => results.show(item.title, () => loadCourseItems('rrb', 'videos', { category: item.id, search: item.title }))}
+            />
           ))}
-        </View>
-      </ScrollView>
+        </MenuStack>
+      </ScreenScroll>
       <ApiResultsModal visible={results.visible} title={results.title} loading={results.loading} items={results.items} emptyMessage={results.emptyMessage} onClose={results.close} />
-    </View>
+    </Screen>
   );
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1 },
-  statusBarSpace: { height: STATUSBAR_HEIGHT, backgroundColor: 'transparent' },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 16 },
-  backButton: { width: 40, height: 40, borderRadius: 12, justifyContent: 'center', alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 3 },
-  backIcon: { fontSize: 20 },
-  headerTitle: { fontSize: 18, fontWeight: '700' },
-  placeholder: { width: 40 },
-  scrollView: { flex: 1 },
-  scrollContent: { paddingHorizontal: 20, paddingBottom: 30 },
-  infoCard: { borderRadius: 20, padding: 20, marginBottom: 24, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 8, elevation: 4 },
-  infoTitle: { fontSize: 18, fontWeight: '700', marginBottom: 4 },
-  infoSubtitle: { fontSize: 14 },
-  youtubeBanner: { flexDirection: 'row', alignItems: 'center', padding: 20, borderRadius: 16, marginBottom: 24, backgroundColor: '#FF0000', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 12, elevation: 5 },
-  youtubeIconContainer: { width: 56, height: 56, borderRadius: 14, justifyContent: 'center', alignItems: 'center', marginRight: 16, backgroundColor: '#FFFFFF' },
-  youtubeIcon: { fontSize: 28 },
-  youtubeContent: { flex: 1 },
-  youtubeTitle: { fontSize: 16, fontWeight: '700', marginBottom: 4, color: '#FFFFFF' },
-  youtubeSubtitle: { fontSize: 13, color: '#FFFFFF' },
-  sectionHeader: { marginBottom: 12 },
-  sectionTitle: { fontSize: 17, fontWeight: '700' },
-  menuContainer: { gap: 12 },
-  menuCard: { flexDirection: 'row', alignItems: 'center', padding: 16, borderRadius: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 12, elevation: 5 },
-  menuIconContainer: { width: 48, height: 48, borderRadius: 12, justifyContent: 'center', alignItems: 'center', marginRight: 14 },
-  menuIcon: { fontSize: 24 },
-  menuTextContainer: { flex: 1 },
-  menuTitle: { fontSize: 15, fontWeight: '600' },
-  menuSubtitle: { fontSize: 12 },
-  menuArrow: { fontSize: 24, fontWeight: '300' },
-});

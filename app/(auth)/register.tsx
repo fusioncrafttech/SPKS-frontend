@@ -1,19 +1,22 @@
 import { Link, router } from 'expo-router';
 import { useState } from 'react';
 import {
-    Alert,
-    Keyboard,
-    KeyboardAvoidingView,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    TouchableOpacity,
-    TouchableWithoutFeedback,
-    View,
+  Alert,
+  Keyboard,
+  KeyboardAvoidingView,
+  Platform,
+  StyleSheet,
+  TouchableOpacity,
+  TouchableWithoutFeedback,
+  View,
 } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
+import { HeroBanner } from '@/components/ui/hero-banner';
+import { PrimaryButton } from '@/components/ui/primary-button';
+import { Screen, ScreenScroll } from '@/components/ui/screen';
 import { TextInput } from '@/components/ui/text-input';
+import { Brand } from '@/constants/brand';
 import { useAuth } from '@/contexts/auth-context';
 import { useTheme } from '@/contexts/theme-context';
 
@@ -77,15 +80,17 @@ export default function RegisterScreen() {
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <Screen>
       <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
         <KeyboardAvoidingView behavior="padding" style={styles.keyboardView} keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}>
-          <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} keyboardDismissMode="on-drag" bounces={false}>
-            <View style={styles.header}>
-              <ThemedText type="title" style={[styles.title, { color: colors.text }]}>Create Account</ThemedText>
-              <ThemedText style={[styles.subtitle, { color: colors.textSecondary }]}>Sign up to get started</ThemedText>
-            </View>
-
+          <ScreenScroll keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" bounces={false} contentStyle={styles.scroll}>
+            <HeroBanner
+              icon="person-add"
+              eyebrow="SPKS"
+              title="Create account"
+              subtitle="Start preparing for TNPSC, RRB and TNUSRB"
+              gradient={Brand.indigo}
+            />
             <View style={[styles.formCard, { backgroundColor: colors.card }]}>
               <View style={styles.row}>
                 <View style={styles.halfInput}>
@@ -99,11 +104,8 @@ export default function RegisterScreen() {
               <TextInput label="Mobile Number" placeholder="Enter your mobile number" value={mobileNumber} onChangeText={setMobileNumber} error={errors.mobileNumber} keyboardType="phone-pad" maxLength={10} />
               <TextInput label="Password" placeholder="Enter your password" value={password} onChangeText={setPassword} error={errors.password} secureTextEntry autoCapitalize="none" autoCorrect={false} />
               <TextInput label="Confirm Password" placeholder="Confirm your password" value={confirmPassword} onChangeText={setConfirmPassword} error={errors.confirmPassword} secureTextEntry autoCapitalize="none" autoCorrect={false} />
-              <TouchableOpacity style={[styles.button, { backgroundColor: colors.tint }]} onPress={handleRegister} disabled={isLoading} activeOpacity={0.8}>
-                <ThemedText style={styles.buttonText}>{isLoading ? 'Creating Account...' : 'Register'}</ThemedText>
-              </TouchableOpacity>
+              <PrimaryButton title={isLoading ? 'Creating Account...' : 'Register'} onPress={handleRegister} disabled={isLoading} />
             </View>
-
             <View style={styles.footer}>
               <ThemedText style={[styles.footerText, { color: colors.textSecondary }]}>Already have an account? </ThemedText>
               <Link href="/(auth)/login" asChild>
@@ -112,26 +114,20 @@ export default function RegisterScreen() {
                 </TouchableOpacity>
               </Link>
             </View>
-          </ScrollView>
+          </ScreenScroll>
         </KeyboardAvoidingView>
       </TouchableWithoutFeedback>
-    </View>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
   keyboardView: { flex: 1 },
-  scrollContent: { flexGrow: 1, justifyContent: 'center', paddingHorizontal: 24, paddingTop: 40, paddingBottom: 320 },
-  header: { alignItems: 'center', marginBottom: 32 },
-  title: { marginBottom: 8 },
-  subtitle: { fontSize: 16 },
-  formCard: { borderRadius: 16, padding: 24, marginBottom: 24, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 3 },
+  scroll: { paddingTop: 12, paddingBottom: 40 },
+  formCard: { borderRadius: 22, padding: 20, marginBottom: 20 },
   row: { flexDirection: 'row', gap: 12 },
   halfInput: { flex: 1 },
-  button: { height: 50, borderRadius: 12, justifyContent: 'center', alignItems: 'center', marginTop: 8 },
-  buttonText: { color: '#fff', fontSize: 16, fontWeight: '600' },
   footer: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center' },
   footerText: { fontSize: 14 },
-  linkText: { fontSize: 14, fontWeight: '600' },
+  linkText: { fontSize: 14, fontWeight: '700' },
 });

@@ -1,6 +1,8 @@
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { ActivityIndicator, FlatList, Modal, StyleSheet, TouchableOpacity, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
+import { MenuRow } from '@/components/ui/menu-row';
 import { useTheme } from '@/contexts/theme-context';
 import { CatalogItem, itemSubtitle, itemTitle, openCatalogItem } from '@/lib/catalog';
 
@@ -26,11 +28,12 @@ export function ApiResultsModal({
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <View style={styles.overlay}>
-        <View style={[styles.sheet, { backgroundColor: colors.card }]}>
-          <View style={[styles.header, { borderBottomColor: colors.border }]}>
+        <View style={[styles.sheet, { backgroundColor: colors.background }]}>
+          <View style={styles.handle} />
+          <View style={styles.header}>
             <ThemedText style={[styles.title, { color: colors.text }]}>{title}</ThemedText>
-            <TouchableOpacity onPress={onClose}>
-              <ThemedText style={[styles.close, { color: colors.textSecondary }]}>✕</ThemedText>
+            <TouchableOpacity onPress={onClose} style={[styles.close, { backgroundColor: colors.card }]}>
+              <Ionicons name="close" size={18} color={colors.text} />
             </TouchableOpacity>
           </View>
           {loading ? (
@@ -46,23 +49,20 @@ export function ApiResultsModal({
               ListEmptyComponent={
                 <ThemedText style={[styles.hint, { color: colors.textSecondary }]}>{emptyMessage}</ThemedText>
               }
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  style={[styles.item, { borderBottomColor: colors.border }]}
-                  onPress={() => openCatalogItem(item)}
-                  activeOpacity={0.7}
-                >
-                  <View style={styles.itemText}>
-                    <ThemedText style={[styles.itemTitle, { color: colors.text }]}>{itemTitle(item)}</ThemedText>
-                    {!!itemSubtitle(item) && (
-                      <ThemedText style={[styles.itemSubtitle, { color: colors.textSecondary }]} numberOfLines={2}>
-                        {itemSubtitle(item)}
-                      </ThemedText>
-                    )}
-                  </View>
-                  <ThemedText style={[styles.arrow, { color: colors.textMuted }]}>›</ThemedText>
-                </TouchableOpacity>
+              renderItem={({ item, index }) => (
+                <MenuRow
+                  title={itemTitle(item)}
+                  subtitle={item.isLocked ? 'Premium' : itemSubtitle(item) || (item.totalQuestions ? `${item.totalQuestions} questions` : undefined)}
+                  icon={item.isLocked ? 'lock-closed-outline' : item.category === 'test' || item.totalQuestions ? 'create-outline' : 'document-text-outline'}
+                  index={index}
+                  locked={item.isLocked}
+                  onPress={() => {
+                    onClose();
+                    void openCatalogItem(item);
+                  }}
+                />
               )}
+              ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
             />
           )}
         </View>
@@ -74,30 +74,44 @@ export function ApiResultsModal({
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: 'rgba(15,23,42,0.45)',
     justifyContent: 'flex-end',
   },
   sheet: {
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    maxHeight: '75%',
-    minHeight: 220,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    maxHeight: '78%',
+    minHeight: 240,
+    paddingHorizontal: 20,
+    paddingBottom: 24,
+  },
+  handle: {
+    width: 42,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#CBD5E1',
+    alignSelf: 'center',
+    marginTop: 10,
+    marginBottom: 8,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 20,
-    borderBottomWidth: 1,
+    paddingVertical: 12,
   },
   title: {
     fontSize: 18,
-    fontWeight: '700',
+    fontWeight: '800',
     flex: 1,
     marginRight: 12,
   },
   close: {
-    fontSize: 20,
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   centered: {
     padding: 32,
@@ -112,28 +126,4 @@ const styles = StyleSheet.create({
   list: {
     paddingBottom: 24,
   },
-  item: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-  },
-  itemText: {
-    flex: 1,
-  },
-  itemTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 2,
-  },
-  itemSubtitle: {
-    fontSize: 13,
-  },
-  arrow: {
-    fontSize: 22,
-    fontWeight: '300',
-    marginLeft: 8,
-  },
 });
-
