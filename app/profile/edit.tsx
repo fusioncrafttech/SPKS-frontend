@@ -33,6 +33,7 @@ export default function EditProfileScreen() {
   const [email, setEmail] = useState(mapped?.email || '');
   const [phone, setPhone] = useState(mapped?.phone || '');
   const [profileImage, setProfileImage] = useState<string | null>(mapped?.profileImage || null);
+  const [pickedAsset, setPickedAsset] = useState<ImagePicker.ImagePickerAsset | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
@@ -53,14 +54,16 @@ export default function EditProfileScreen() {
     }
 
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ['images'],
       allowsEditing: true,
       aspect: [1, 1],
-      quality: 0.8,
+      quality: 0.5,
+      exif: false,
     });
 
     if (!result.canceled && result.assets[0]) {
       setProfileImage(result.assets[0].uri);
+      setPickedAsset(result.assets[0]);
     }
   };
 
@@ -74,11 +77,13 @@ export default function EditProfileScreen() {
     const result = await ImagePicker.launchCameraAsync({
       allowsEditing: true,
       aspect: [1, 1],
-      quality: 0.8,
+      quality: 0.5,
+      exif: false,
     });
 
     if (!result.canceled && result.assets[0]) {
       setProfileImage(result.assets[0].uri);
+      setPickedAsset(result.assets[0]);
     }
   };
 
@@ -94,6 +99,7 @@ export default function EditProfileScreen() {
             const saved = await deleteProfileImage();
             setUser(saved);
             setProfileImage(null);
+            setPickedAsset(null);
           } catch (error) {
             Alert.alert('Error', error instanceof Error ? error.message : 'Could not remove photo.');
           }
@@ -112,11 +118,22 @@ export default function EditProfileScreen() {
     setIsLoading(true);
     try {
       let savedUser = user;
-      if (profileImage && profileImage !== user?.profileImage && (profileImage.startsWith('file://') || profileImage.startsWith('content://'))) {
+      const isLocalPhoto = Boolean(
+        profileImage &&
+          (profileImage.startsWith('file:') ||
+            profileImage.startsWith('content:') ||
+            profileImage.startsWith('ph:') ||
+            profileImage.startsWith('blob:') ||
+            profileImage.startsWith('data:') ||
+            pickedAsset),
+      );
+      if (isLocalPhoto && profileImage) {
+        const asset = pickedAsset;
+        const mime = asset?.mimeType === 'image/jpg' ? 'image/jpeg' : asset?.mimeType || 'image/jpeg';
         savedUser = await uploadProfileImage({
-          uri: profileImage,
-          name: 'profile-image.jpg',
-          type: 'image/jpeg',
+          uri: asset?.uri || profileImage,
+          name: asset?.fileName || 'profile-image.jpg',
+          type: mime,
         });
       }
       savedUser = await updateProfile({

@@ -39,13 +39,82 @@ function expoLanHost() {
 }
 
 function defaultApiUrl() {
-  const fallback = Platform.OS === 'android' ? 'http://10.0.2.2:4000' : 'http://localhost:4000';
-  const fromEnv = process.env.EXPO_PUBLIC_API_URL?.replace(/\/$/, '') || fallback;
+  const production = 'https://spks-exams-backend.vercel.app';
+  const fromEnv = process.env.EXPO_PUBLIC_API_URL?.replace(/\/$/, '');
+  const url = fromEnv || production;
   const lanHost = expoLanHost();
-  if (lanHost && /localhost|127\.0\.0\.1/.test(fromEnv)) {
-    return fromEnv.replace(/localhost|127\.0\.0\.1/g, lanHost);
+  if (lanHost && /localhost|127\.0\.0\.1/.test(url)) {
+    return url.replace(/localhost|127\.0\.0\.1/g, lanHost);
   }
-  return fromEnv;
+  return url;
+}
+
+function isFormDataBody(body: unknown): body is FormData {
+  return Boolean(body && typeof body === 'object' && typeof (body as FormData).append === 'function');
+}
+
+function requestHeaders(options: RequestInit, accessToken: string | null) {
+  const headers: Record<string, string> = {};
+  const incoming = options.headers;
+  if (incoming instanceof Headers) {
+    incoming.forEach((value, key) => {
+      headers[key] = value;
+    });
+  } else if (Array.isArray(incoming)) {
+    incoming.forEach(([key, value]) => {
+      headers[key] = value;
+    });
+  } else if (incoming) {
+    Object.entries(incoming).forEach(([key, value]) => {
+      if (value != null) headers[key] = String(value);
+    });
+  }
+  if (!isFormDataBody(options.body) && !headers['Content-Type'] && !headers['content-type']) {
+    headers['Content-Type'] = 'application/json';
+  }
+  if (isFormDataBody(options.body)) {
+    delete headers['Content-Type'];
+    delete headers['content-type'];
+  }
+  if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
+  return headers;
+}
+
+function networkError(error?: unknown, kind: 'upload' | 'request' = 'request') {
+  const detail = error instanceof Error ? error.message : '';
+  if (kind === 'upload') {
+    if (/timeout/i.test(detail)) {
+      return new ApiError('Photo upload timed out. Try a smaller image.', 0);
+    }
+    return new ApiError('Could not upload the photo. Check your internet and try a smaller image.', 0);
+  }
+  return new ApiError('Cannot reach the server. Check your internet connection.', 0);
+}
+
+async function sendFormData(url: string, formData: FormData, headers: Record<string, string>) {
+  if (Platform.OS === 'web') {
+    return fetch(url, { method: 'POST', headers, body: formData });
+  }
+
+  return new Promise<Response>((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', url);
+    Object.entries(headers).forEach(([key, value]) => {
+      if (key.toLowerCase() !== 'content-type') xhr.setRequestHeader(key, value);
+    });
+    xhr.timeout = 60_000;
+    xhr.onload = () => {
+      resolve(
+        new Response(xhr.responseText, {
+          status: xhr.status,
+          headers: { 'Content-Type': xhr.getResponseHeader('Content-Type') || 'application/json' },
+        }),
+      );
+    };
+    xhr.onerror = () => reject(new TypeError('Network request failed'));
+    xhr.ontimeout = () => reject(new Error('timeout'));
+    xhr.send(formData);
+  });
 }
 
 export const API_URL = defaultApiUrl();
@@ -165,15 +234,16 @@ export function toAbsoluteApiUrl(pathOrUrl?: string | null) {
 export async function apiFetch(pathOrUrl: string, options: RequestInit = {}, retry = true): Promise<Response> {
   const url = toAbsoluteApiUrl(pathOrUrl) || pathOrUrl;
   const accessToken = await getAccessToken();
-  const headers = new Headers(options.headers);
-  if (accessToken) headers.set('Authorization', `Bearer ${accessToken}`);
+  const headers = requestHeaders(options, accessToken);
 
   let response: Response;
   try {
-    response = await fetch(url, { ...options, headers });
+    response = isFormDataBody(options.body)
+      ? await sendFormData(url, options.body, headers)
+      : await fetch(url, { ...options, headers });
   } catch (error) {
     if (isAbortError(error) || options.signal?.aborted) throw error;
-    throw new ApiError('Cannot reach the server. Check that the backend is running and EXPO_PUBLIC_API_URL is set.', 0);
+    throw networkError(error, isFormDataBody(options.body) ? 'upload' : 'request');
   }
 
   if (response.status === 401 && retry && (await refreshAccessToken())) {
@@ -185,18 +255,16 @@ export async function apiFetch(pathOrUrl: string, options: RequestInit = {}, ret
 
 async function sendApiRequest<T>(path: string, options: RequestInit = {}, retry = true): Promise<T> {
   const accessToken = await getAccessToken();
-  const headers = new Headers(options.headers);
-  if (!(options.body instanceof FormData)) {
-    headers.set('Content-Type', headers.get('Content-Type') || 'application/json');
-  }
-  if (accessToken) headers.set('Authorization', `Bearer ${accessToken}`);
+  const headers = requestHeaders(options, accessToken);
 
   let response: Response;
   try {
-    response = await fetch(`${API_URL}${path}`, { ...options, headers });
+    response = isFormDataBody(options.body)
+      ? await sendFormData(`${API_URL}${path}`, options.body, headers)
+      : await fetch(`${API_URL}${path}`, { ...options, headers });
   } catch (error) {
     if (isAbortError(error) || options.signal?.aborted) throw error;
-    throw new ApiError('Cannot reach the server. Check that the backend is running and EXPO_PUBLIC_API_URL is set.', 0);
+    throw networkError(error, isFormDataBody(options.body) ? 'upload' : 'request');
   }
 
   if (response.status === 401 && retry && (await refreshAccessToken())) {
@@ -263,13 +331,20 @@ export const api = {
     apiRequest<T>(path, { method: 'PATCH', body: body === undefined ? undefined : JSON.stringify(body) }),
   delete: <T>(path: string, body?: unknown) =>
     apiRequest<T>(path, { method: 'DELETE', body: body === undefined ? undefined : JSON.stringify(body) }),
-  upload: <T>(path: string, file: { uri: string; name?: string; type?: string }, fieldName = 'file') => {
+  upload: async <T>(path: string, file: { uri: string; name?: string; type?: string }, fieldName = 'file') => {
+    const name = file.name || 'profile-image.jpg';
+    const type = file.type && file.type !== 'image/jpg' ? file.type : 'image/jpeg';
     const formData = new FormData();
-    formData.append(fieldName, {
-      uri: file.uri,
-      name: file.name || 'upload.jpg',
-      type: file.type || 'image/jpeg',
-    } as unknown as Blob);
+    if (Platform.OS === 'web') {
+      const blob = await (await fetch(file.uri)).blob();
+      formData.append(fieldName, blob, name);
+    } else {
+      formData.append(fieldName, {
+        uri: file.uri,
+        name,
+        type,
+      } as unknown as Blob);
+    }
     return apiRequest<T>(path, { method: 'POST', body: formData });
   },
 };
