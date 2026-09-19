@@ -1,5 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
     Alert,
@@ -21,6 +22,7 @@ import { TextInput } from '@/components/ui/text-input';
 import { useTheme } from '@/contexts/theme-context';
 import { changePassword } from '@/lib/auth';
 import { api } from '@/lib/api';
+import { useAuth } from '@/contexts/auth-context';
 
 const LANGUAGES = [
   { id: 'en', name: 'English', native: 'English' },
@@ -36,6 +38,8 @@ const LANGUAGES = [
 
 export default function SettingsScreen() {
   const { colors, isDark, setTheme } = useTheme();
+  const { deleteAccount } = useAuth();
+  const [deleting, setDeleting] = useState(false);
   const [emailNotifications, setEmailNotifications] = useState(true);
   const [autoPlay, setAutoPlay] = useState(false);
   const [downloadOverWifi, setDownloadOverWifi] = useState(true);
@@ -136,6 +140,46 @@ export default function SettingsScreen() {
     } finally {
       setPasswordLoading(false);
     }
+  };
+
+  const handleDeleteAccount = () => {
+    Alert.alert(
+      'Delete account',
+      'This permanently deletes your SPKS Exam Academy account, test history and progress. This cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => {
+            Alert.alert('Confirm deletion', 'Are you sure you want to delete this account?', [
+              { text: 'Cancel', style: 'cancel' },
+              {
+                text: 'Yes, delete',
+                style: 'destructive',
+                onPress: async () => {
+                  setDeleting(true);
+                  try {
+                    await deleteAccount();
+                    router.replace('/(auth)/login');
+                    Alert.alert('Account deleted', 'Your account and personal data have been removed.');
+                  } catch (error) {
+                    Alert.alert(
+                      'Could not delete',
+                      error instanceof Error
+                        ? error.message
+                        : 'Please try again or email fusioncraft@gmail.com from your registered address.',
+                    );
+                  } finally {
+                    setDeleting(false);
+                  }
+                },
+              },
+            ]);
+          },
+        },
+      ],
+    );
   };
 
   return (
@@ -281,6 +325,24 @@ export default function SettingsScreen() {
             <View style={styles.settingInfo}>
               <Ionicons name="trash-outline" size={20} color={colors.tint} style={styles.settingIcon} />
               <ThemedText style={[styles.settingLabel, { color: colors.text }]}>Clear Cache</ThemedText>
+            </View>
+            <ThemedText style={[styles.linkArrow, { color: colors.textMuted }]}>›</ThemedText>
+          </TouchableOpacity>
+        </View>
+
+        <ThemedText style={[styles.sectionTitle, { color: colors.textSecondary }]}>Account</ThemedText>
+        <View style={[styles.card, { backgroundColor: colors.card }]}>
+          <TouchableOpacity style={styles.linkItem} onPress={handleDeleteAccount} disabled={deleting}>
+            <View style={styles.settingInfo}>
+              <Ionicons name="warning-outline" size={20} color={colors.danger} style={styles.settingIcon} />
+              <View style={styles.settingTextContainer}>
+                <ThemedText style={[styles.settingLabel, { color: colors.danger }]}>
+                  {deleting ? 'Deleting account...' : 'Delete account'}
+                </ThemedText>
+                <ThemedText style={[styles.settingDescription, { color: colors.textSecondary }]}>
+                  Permanently remove your profile and data
+                </ThemedText>
+              </View>
             </View>
             <ThemedText style={[styles.linkArrow, { color: colors.textMuted }]}>›</ThemedText>
           </TouchableOpacity>

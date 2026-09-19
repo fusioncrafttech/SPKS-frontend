@@ -9,6 +9,7 @@ import {
   logoutUser,
   persistUser,
   registerUser,
+  deleteAccount as deleteAccountRequest,
 } from '@/lib/auth';
 import { getCurrentSubscription, isActiveSubscription, type Subscription } from '@/lib/payments';
 import { clearCourseMemory } from '@/lib/catalog';
@@ -29,6 +30,7 @@ type AuthContextType = {
     state?: string;
   }) => Promise<AuthUser>;
   logout: () => Promise<void>;
+  deleteAccount: () => Promise<void>;
   refreshUser: (options?: { force?: boolean }) => Promise<AuthUser | null>;
   applySubscription: (input: { hasActiveSubscription?: boolean; subscription?: Subscription | null }) => void;
   setUser: (user: AuthUser | null) => void;
@@ -162,6 +164,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUserState(null);
   }, []);
 
+  const deleteAccount = useCallback(async () => {
+    await deleteAccountRequest();
+    invalidateApiCache();
+    clearCourseMemory();
+    userRef.current = null;
+    lastRefreshAt.current = 0;
+    setUserState(null);
+  }, []);
+
   const applySubscription = useCallback((input: { hasActiveSubscription?: boolean; subscription?: Subscription | null }) => {
     const prev = userRef.current;
     if (!prev) return;
@@ -207,11 +218,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       login,
       register,
       logout,
+      deleteAccount,
       refreshUser,
       applySubscription,
       setUser,
     }),
-    [user, isReady, hasActiveSubscription, subscription, login, register, logout, refreshUser, applySubscription, setUser],
+    [user, isReady, hasActiveSubscription, subscription, login, register, logout, deleteAccount, refreshUser, applySubscription, setUser],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

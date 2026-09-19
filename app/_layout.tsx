@@ -47,6 +47,8 @@ function RootLayoutNav() {
         }}
       >
         <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+        <Stack.Screen name="privacy" options={{ headerShown: false }} />
+        <Stack.Screen name="delete-account" options={{ headerShown: false }} />
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="tnpsc" options={{ headerShown: false }} />
         <Stack.Screen name="rrb" options={{ headerShown: false }} />

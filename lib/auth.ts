@@ -182,3 +182,9 @@ export async function changePassword(input: { currentPassword: string; newPasswo
 export async function resetPassword(input: { token: string; password: string }) {
   return api.post('/api/auth/reset-password', input);
 }
+
+export async function deleteAccount() {
+  await api.delete('/api/users/me/account');
+  await clearTokens();
+  await persistUser(null);
+}

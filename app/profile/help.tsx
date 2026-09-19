@@ -27,7 +27,7 @@ export default function HelpScreen() {
   const [faqItems, setFaqItems] = useState(faqs);
   const [contact, setContact] = useState({
     phone: '+91 9360121830',
-    email: 'fusioncraft.gmail.com',
+    email: 'fusioncraft@gmail.com',
     whatsapp: '+91 9360121830',
     hours: 'Monday - Friday, 9:00 AM - 6:00 PM',
     address: '',

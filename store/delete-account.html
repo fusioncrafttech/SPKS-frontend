@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Delete Account · SPKS Exam Academy</title>
+  <meta name="description" content="Request deletion of your SPKS Exam Academy account and personal data." />
+  <style>
+    :root { --indigo:#1E1B4B; --tint:#4338CA; --bg:#EEF2FF; --text:#1E1B4B; --muted:#4C4F7C; --danger:#dc2626; }
+    * { box-sizing: border-box; }
+    body { margin:0; font-family: Segoe UI, system-ui, sans-serif; background:var(--bg); color:var(--text); line-height:1.65; }
+    header { background: linear-gradient(135deg,#1E1B4B,#4338CA); color:#fff; padding:36px 20px 40px; }
+    header .wrap, main, footer .wrap { max-width:760px; margin:0 auto; }
+    .brand { font-size:13px; letter-spacing:.12em; text-transform:uppercase; opacity:.85; margin:0 0 8px; }
+    h1 { margin:0; font-size:32px; }
+    .updated { margin:10px 0 0; opacity:.85; font-size:14px; }
+    main { background:#fff; margin:-20px auto 40px; padding:28px 24px 40px; border-radius:20px; box-shadow:0 12px 40px rgba(30,27,75,.08); }
+    h2 { font-size:18px; margin:28px 0 8px; }
+    p, li { color:var(--muted); }
+    ul { padding-left:20px; }
+    a { color:var(--tint); }
+    label { display:block; font-weight:700; margin:16px 0 6px; }
+    input, textarea { width:100%; padding:12px 14px; border:1px solid #C7D2FE; border-radius:12px; font:inherit; background:#F8FAFF; }
+    textarea { min-height:110px; resize:vertical; }
+    .check { display:flex; gap:10px; align-items:flex-start; margin:16px 0 20px; }
+    .check input { width:auto; margin-top:4px; }
+    button { background:var(--danger); color:#fff; border:0; border-radius:12px; padding:14px 18px; font-size:16px; font-weight:700; cursor:pointer; width:100%; }
+    .note { background:#EEF2FF; border-radius:12px; padding:14px 16px; }
+    footer { padding:0 20px 40px; color:var(--muted); font-size:13px; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap">
+      <p class="brand">SPKS Exam Academy</p>
+      <h1>Delete your account</h1>
+      <p class="updated">We complete deletion within 7 days</p>
+    </div>
+  </header>
+  <main>
+    <h2>How to delete</h2>
+    <p>You can delete your SPKS Exam Academy account in either of these ways:</p>
+    <ul>
+      <li><strong>In the app:</strong> open Profile → Settings → Delete account, then confirm.</li>
+      <li><strong>On this page:</strong> send a deletion request with the email used to register. We will verify the request and delete the account.</li>
+    </ul>
+
+    <h2>What is deleted</h2>
+    <p>We delete your profile (name, email, phone, photo), login credentials, test history, progress, bookmarks, support tickets, and device tokens.</p>
+    <p>We may keep anonymised or legally required payment invoices for tax and fraud prevention. Active subscriptions are cancelled; refunds follow the published refund policy and Razorpay rules.</p>
+
+    <h2>Send a deletion request</h2>
+    <p class="note">Use the same email address that is registered in the app. After we receive the request we delete the account within 7 days and email a confirmation.</p>
+    <form id="delete-form">
+      <label for="email">Registered email</label>
+      <input id="email" name="email" type="email" required placeholder="you@example.com" />
+      <label for="name">Full name</label>
+      <input id="name" name="name" type="text" required placeholder="Your name" />
+      <label for="reason">Reason (optional)</label>
+      <textarea id="reason" name="reason" placeholder="Tell us why you want to delete the account"></textarea>
+      <label class="check">
+        <input id="confirm" type="checkbox" required />
+        <span>I understand this permanently deletes my SPKS Exam Academy account and learning data.</span>
+      </label>
+      <button type="submit">Request account deletion</button>
+    </form>
+    <p style="margin-top:20px">Privacy details: <a href="./privacy-policy.html">Privacy Policy</a>. Contact: <a href="mailto:fusioncraft@gmail.com">fusioncraft@gmail.com</a> · +91 9360121830</p>
+  </main>
+  <footer>
+    <div class="wrap">© 2026 FusionCraft · SPKS Exam Academy</div>
+  </footer>
+  <script>
+    document.getElementById('delete-form').addEventListener('submit', function (event) {
+      event.preventDefault();
+      var email = document.getElementById('email').value.trim();
+      var name = document.getElementById('name').value.trim();
+      var reason = document.getElementById('reason').value.trim() || 'Not specified';
+      var subject = encodeURIComponent('Delete SPKS Exam Academy account');
+      var body = encodeURIComponent(
+        'Please delete my SPKS Exam Academy account.\n\nName: ' + name +
+        '\nRegistered email: ' + email +
+        '\nReason: ' + reason +
+        '\n\nI confirm this request is for the account registered with this email.'
+      );
+      window.location.href = 'mailto:fusioncraft@gmail.com?subject=' + subject + '&body=' + body;
+    });
+  </script>
+</body>
+</html>

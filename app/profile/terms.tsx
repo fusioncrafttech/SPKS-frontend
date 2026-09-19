@@ -99,7 +99,7 @@ export default function TermsScreen() {
           </ThemedText>
         </AppCard>
         <ThemedText style={{ textAlign: 'center', color: colors.textSecondary, fontSize: 14, marginBottom: 6 }}>
-          For questions, contact fusioncraft.gmail.com
+          For questions, contact fusioncraft@gmail.com
         </ThemedText>
         <ThemedText style={{ textAlign: 'center', color: colors.textMuted, fontSize: 12 }}>Last updated: February 2026</ThemedText>
       </ScreenScroll>
