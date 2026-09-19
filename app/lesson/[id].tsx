@@ -10,7 +10,7 @@ import { PrimaryButton } from '@/components/ui/primary-button';
 import { Screen, ScreenScroll } from '@/components/ui/screen';
 import { useTheme } from '@/contexts/theme-context';
 import { completeLesson, getLesson, hasLessonPdf, isLockedItem, lessonPdfViewUrl, markLessonProgress } from '@/lib/study';
-import { promptPremium } from '@/lib/tests';
+import { handlePremiumError, promptPremium } from '@/lib/tests';
 
 export default function LessonScreen() {
   const { colors } = useTheme();
@@ -24,12 +24,18 @@ export default function LessonScreen() {
       .then(async (data) => {
         setLesson(data);
         if (isLockedItem(data || {})) {
-          promptPremium('This lesson is locked. Upgrade your plan to continue.');
+          promptPremium('This lesson is locked. Buy a plan to continue.');
           return;
         }
         await markLessonProgress(id);
       })
-      .catch((error) => Alert.alert('Lesson', error instanceof Error ? error.message : 'Could not load this lesson.'))
+      .catch((error) => {
+        if (handlePremiumError(error, 'This lesson is locked. Buy a plan to continue.')) {
+          setLesson({ isLocked: true });
+          return;
+        }
+        Alert.alert('Lesson', error instanceof Error ? error.message : 'Could not load this lesson.');
+      })
       .finally(() => setLoading(false));
   }, [id]);
 

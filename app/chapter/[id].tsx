@@ -10,7 +10,7 @@ import { Screen, ScreenScroll } from '@/components/ui/screen';
 import { Brand } from '@/constants/brand';
 import { useTheme } from '@/contexts/theme-context';
 import { listChapterLessons, type NamedItem } from '@/lib/study';
-import { promptPremium } from '@/lib/tests';
+import { handlePremiumError, promptPremium } from '@/lib/tests';
 
 export default function ChapterScreen() {
   const { colors } = useTheme();
@@ -22,7 +22,9 @@ export default function ChapterScreen() {
     if (!id) return;
     listChapterLessons(id)
       .then(setLessons)
-      .catch(() => undefined)
+      .catch((error) => {
+        if (handlePremiumError(error, 'This course is locked. Buy a plan to continue.')) return;
+      })
       .finally(() => setLoading(false));
   }, [id]);
 
@@ -53,7 +55,7 @@ export default function ChapterScreen() {
                 locked={item.isLocked}
                 onPress={() => {
                   if (item.isLocked) {
-                    promptPremium('This lesson is locked. Upgrade your plan to continue.');
+                    promptPremium('This lesson is locked. Buy a plan to continue.');
                     return;
                   }
                   router.push(`/lesson/${item.id}` as any);

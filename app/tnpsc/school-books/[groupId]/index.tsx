@@ -10,6 +10,7 @@ import { Screen, ScreenScroll } from '@/components/ui/screen';
 import { Brand } from '@/constants/brand';
 import { useTheme } from '@/contexts/theme-context';
 import { getGroup, listGroupClasses, type NamedItem } from '@/lib/study';
+import { handlePremiumError } from '@/lib/premium';
 
 export default function SchoolBooksScreen() {
   const { colors } = useTheme();
@@ -25,7 +26,10 @@ export default function SchoolBooksScreen() {
     });
     listGroupClasses(groupId)
       .then(setClasses)
-      .catch(() => setClasses([]))
+      .catch((error) => {
+        if (handlePremiumError(error, 'This course is locked. Buy a plan to continue.')) return;
+        setClasses([]);
+      })
       .finally(() => setLoading(false));
   }, [groupId]);
 

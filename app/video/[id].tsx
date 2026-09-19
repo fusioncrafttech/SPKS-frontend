@@ -10,7 +10,7 @@ import { PrimaryButton } from '@/components/ui/primary-button';
 import { Screen } from '@/components/ui/screen';
 import { useTheme } from '@/contexts/theme-context';
 import { getVideo, isLockedItem, markLessonProgress, recordVideoView, toggleBookmark } from '@/lib/study';
-import { promptPremium } from '@/lib/tests';
+import { handlePremiumError, promptPremium } from '@/lib/tests';
 
 function youtubeSrc(video: Record<string, any> | null) {
   const id = video?.youtubeId || video?.youtube_id;
@@ -32,10 +32,16 @@ export default function VideoScreen() {
         setVideo(data);
         setBookmarked(Boolean(data?.isBookmarked));
         if (data?.lessonId) void markLessonProgress(String(data.lessonId));
-        if (isLockedItem(data || {})) promptPremium();
+        if (isLockedItem(data || {})) promptPremium('This video is locked. Buy a plan to continue.');
         else void recordVideoView(id);
       })
-      .catch((error) => Alert.alert('Video', error instanceof Error ? error.message : 'Could not load this video.'))
+      .catch((error) => {
+        if (handlePremiumError(error, 'This video is locked. Buy a plan to continue.')) {
+          setVideo({ isLocked: true });
+          return;
+        }
+        Alert.alert('Video', error instanceof Error ? error.message : 'Could not load this video.');
+      })
       .finally(() => setLoading(false));
   }, [id]);
 

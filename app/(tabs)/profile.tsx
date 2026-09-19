@@ -11,6 +11,7 @@ import { useAuth } from '@/contexts/auth-context';
 import { useTheme } from '@/contexts/theme-context';
 import { api } from '@/lib/api';
 import { mapProfile } from '@/lib/auth';
+import { formatSubscriptionDate, subscriptionEndsAt } from '@/lib/payments';
 
 const LIST_ITEMS: { id: string; title: string; icon: IonName; route: string }[] = [
   { id: 'progress', title: 'Progress', icon: 'trending-up-outline', route: '/profile/progress' },
@@ -33,7 +34,7 @@ interface ProfileData {
 
 export default function ProfileScreen() {
   const { colors, isDark } = useTheme();
-  const { user, logout, refreshUser } = useAuth();
+  const { user, logout, refreshUser, hasActiveSubscription, subscription } = useAuth();
   const mapped = mapProfile(user);
   const [profile, setProfile] = useState<ProfileData>({
     firstName: mapped?.firstName || '',
@@ -109,6 +110,8 @@ export default function ProfileScreen() {
 
   const fullName = `${profile.firstName} ${profile.lastName}`.trim() || 'Student';
   const initials = (profile.firstName || profile.email || 'S').charAt(0).toUpperCase();
+  const planLabel = subscription?.planName || subscription?.name;
+  const endsAtLabel = formatSubscriptionDate(subscriptionEndsAt(subscription));
 
   return (
     <Screen>
@@ -145,6 +148,14 @@ export default function ProfileScreen() {
               <View style={[styles.chip, { backgroundColor: isDark ? '#312E81' : '#EEF2FF' }]}>
                 <Ionicons name="school-outline" size={13} color={isDark ? '#C7D2FE' : '#4338CA'} />
                 <ThemedText style={[styles.chipText, { color: isDark ? '#C7D2FE' : '#4338CA' }]}>Exam aspirant</ThemedText>
+              </View>
+              <View style={[styles.chip, { backgroundColor: hasActiveSubscription ? (isDark ? '#14532D' : '#ECFDF5') : isDark ? '#422006' : '#FFF7ED' }]}>
+                <Ionicons name={hasActiveSubscription ? 'diamond' : 'lock-closed-outline'} size={13} color={hasActiveSubscription ? '#059669' : '#EA580C'} />
+                <ThemedText style={[styles.chipText, { color: hasActiveSubscription ? '#059669' : '#EA580C' }]}>
+                  {hasActiveSubscription
+                    ? `${planLabel || 'Premium'}${endsAtLabel ? ` · ${endsAtLabel}` : ''}`
+                    : 'No active plan'}
+                </ThemedText>
               </View>
             </View>
 
@@ -286,6 +297,10 @@ const styles = StyleSheet.create({
   chipRow: {
     marginTop: 10,
     marginBottom: 14,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: 8,
   },
   chip: {
     flexDirection: 'row',

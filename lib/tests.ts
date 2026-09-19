@@ -3,6 +3,9 @@ import { router } from 'expo-router';
 
 import { ApiError, api, asList } from './api';
 import { asCatalogItem, type CatalogItem } from './catalog';
+import { handlePremiumError, isPremiumRequired, promptPremium } from './premium';
+
+export { handlePremiumError, isPremiumRequired, promptPremium };
 
 export type TestQuestion = {
   id: string;
@@ -63,17 +66,6 @@ export function cacheAttempt(attempt: StartedAttempt) {
 
 export function getCachedAttempt(attemptId: string) {
   return cachedAttempt?.attemptId === attemptId ? cachedAttempt : null;
-}
-
-export function isPremiumRequired(error: unknown) {
-  return error instanceof ApiError && (error.code === 'PREMIUM_REQUIRED' || error.status === 403);
-}
-
-export function promptPremium(message?: string) {
-  Alert.alert('Premium required', message || 'This test is locked. Upgrade your plan to continue.', [
-    { text: 'Cancel', style: 'cancel' },
-    { text: 'View plans', onPress: () => router.push('/(tabs)/price') },
-  ]);
 }
 
 function asOptions(value: unknown): string[] {

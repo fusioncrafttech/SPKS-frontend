@@ -1,4 +1,5 @@
 import { api, ApiError, asList } from './api';
+import { isPremiumRequired } from './premium';
 
 export type Course = {
   id: string;
@@ -9,6 +10,8 @@ export type Course = {
   subtitle?: string;
   imageUrl?: string | null;
   icon?: string | null;
+  isLocked?: boolean;
+  requiresPlan?: boolean;
 };
 
 export type CatalogItem = {
@@ -51,6 +54,18 @@ export function courseRoute(course: Pick<Course, 'id' | 'name' | 'slug' | 'title
   return match?.route;
 }
 
+export function isCurrentAffairsCourse(course: Pick<Course, 'id' | 'name' | 'slug' | 'title'>) {
+  return courseRoute(course) === '/current-affairs';
+}
+
+export function isCourseLocked(course: Course, hasActiveSubscription: boolean) {
+  if (isCurrentAffairsCourse(course)) return false;
+  if (hasActiveSubscription) return false;
+  if (course.isLocked === true || course.requiresPlan === true) return true;
+  if (course.isLocked === false && course.requiresPlan === false) return false;
+  return true;
+}
+
 export async function listCourses() {
   return asList<Course>(await api.get<Course[]>('/api/courses', { limit: 50 }));
 }
@@ -60,8 +75,8 @@ export async function getCourse(idOrSlug: string) {
     const data = await api.get<any>(`/api/courses/${idOrSlug}`);
     const course = data?.id ? data : data?.course || (Array.isArray(data) ? data[0] : null);
     if (course?.id) return course as Course;
-  } catch {
-    // Fall back to scanning the course list.
+  } catch (error) {
+    if (isPremiumRequired(error)) throw error;
   }
   return findCourse(idOrSlug);
 }

@@ -5,8 +5,10 @@ import { PageHeader } from '@/components/ui/page-header';
 import { Screen, ScreenScroll } from '@/components/ui/screen';
 import { SectionHeading } from '@/components/ui/section-heading';
 import { Brand } from '@/constants/brand';
+import { useAuth } from '@/contexts/auth-context';
 import { useCatalogResults } from '@/hooks/use-catalog-results';
 import { loadCourseItems } from '@/lib/catalog';
+import { sendToPlans } from '@/lib/premium';
 
 const GENERAL_KNOWLEDGE_UNITS = [
   { id: 'gk-1', title: 'Unit 1', icon: 'flask-outline' as const },
@@ -31,8 +33,13 @@ const TAMIL_UNITS = [
 
 export default function BookScreen() {
   const results = useCatalogResults();
+  const { hasActiveSubscription } = useAuth();
 
   const handleUnitPress = (title: string) => {
+    if (!hasActiveSubscription) {
+      sendToPlans();
+      return;
+    }
     results.show(title, () => loadCourseItems('tnpsc', 'books', { search: title }));
   };
 

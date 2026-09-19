@@ -1,3 +1,4 @@
+import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 
@@ -6,11 +7,14 @@ import { EmptyNote } from '@/components/ui/empty-note';
 import { HeroBanner } from '@/components/ui/hero-banner';
 import { MenuRow, MenuStack } from '@/components/ui/menu-row';
 import { PageHeader } from '@/components/ui/page-header';
+import { PrimaryButton } from '@/components/ui/primary-button';
 import { Screen, ScreenScroll } from '@/components/ui/screen';
 import type { IonName } from '@/constants/brand';
+import { useAuth } from '@/contexts/auth-context';
 import { useTheme } from '@/contexts/theme-context';
 import { useCatalogResults } from '@/hooks/use-catalog-results';
 import { getCourse } from '@/lib/catalog';
+import { handlePremiumError } from '@/lib/premium';
 import { listCourseGroups, type NamedItem } from '@/lib/study';
 import { listGroupTests, listTests } from '@/lib/tests';
 
@@ -24,20 +28,33 @@ type Props = {
 
 export function CourseTestScreen({ slug, title = 'Test', subtitle, icon, gradient }: Props) {
   const { colors } = useTheme();
+  const { hasActiveSubscription } = useAuth();
   const results = useCatalogResults();
   const [loading, setLoading] = useState(true);
   const [groups, setGroups] = useState<NamedItem[]>([]);
   const [courseId, setCourseId] = useState<string>();
+  const [premiumBlocked, setPremiumBlocked] = useState(false);
 
   useEffect(() => {
+    if (!hasActiveSubscription) {
+      setPremiumBlocked(true);
+      setLoading(false);
+      return;
+    }
     Promise.all([getCourse(slug), listCourseGroups(slug)])
       .then(([course, items]) => {
         setCourseId(course?.id);
         setGroups(items);
       })
-      .catch(() => setGroups([]))
+      .catch((error) => {
+        if (handlePremiumError(error)) {
+          setPremiumBlocked(true);
+          return;
+        }
+        setGroups([]);
+      })
       .finally(() => setLoading(false));
-  }, [slug]);
+  }, [slug, hasActiveSubscription]);
 
   const openGroupTests = (group: NamedItem) => {
     results.show(group.title, async () => {
@@ -63,6 +80,14 @@ export function CourseTestScreen({ slug, title = 'Test', subtitle, icon, gradien
         {loading ? (
           <View style={{ paddingVertical: 24 }}>
             <ActivityIndicator color={colors.tint} />
+          </View>
+        ) : premiumBlocked ? (
+          <View style={{ gap: 16 }}>
+            <EmptyNote
+              title="Plan required"
+              message="An active plan is required to open courses. Choose 1 month, 6 months, or 1 year."
+            />
+            <PrimaryButton title="View plans" onPress={() => router.push('/(tabs)/price')} />
           </View>
         ) : groups.length ? (
           <MenuStack>

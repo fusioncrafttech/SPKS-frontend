@@ -60,7 +60,7 @@ export function ApiResultsModal({
                   onPress={() => {
                     if (item.isLocked) {
                       onClose();
-                      promptPremium('This file is locked. Upgrade your plan to view it.');
+                      promptPremium('This file is locked. Buy a plan to view it.');
                       return;
                     }
                     onClose();

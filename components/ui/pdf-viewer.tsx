@@ -105,7 +105,7 @@ export function PdfViewer({ uri }: Props) {
 
         const response = await apiFetch(sourceUri);
         if (response.status === 403) {
-          promptPremium('This file is locked. Upgrade your plan to view it.');
+          promptPremium('This file is locked. Buy a plan to view it.');
           throw new ApiError('Premium required', 403, undefined, 'PREMIUM_REQUIRED');
         }
         if (!response.ok) {

@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { router } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
+import { router, useFocusEffect } from 'expo-router';
+import { useCallback, useMemo, useState } from 'react';
 import {
   Image,
   Platform,
@@ -16,7 +16,8 @@ import { ThemedText } from '@/components/themed-text';
 import { useAuth } from '@/contexts/auth-context';
 import { useTheme } from '@/contexts/theme-context';
 import { api } from '@/lib/api';
-import { courseRoute, listCourses } from '@/lib/catalog';
+import { courseRoute, isCourseLocked, listCourses, type Course } from '@/lib/catalog';
+import { sendToPlans } from '@/lib/premium';
 import { getContinueLearning, getStreak, openContinueItem, type ContinueLearning } from '@/lib/study';
 
 const STATUSBAR_HEIGHT = Platform.OS === 'ios' ? 44 : StatusBar.currentHeight || 24;
@@ -32,6 +33,7 @@ type HomeCourse = {
   title: string;
   subtitle: string;
   route: string;
+  locked: boolean;
 };
 
 const STUDY_TIPS = [
@@ -42,10 +44,10 @@ const STUDY_TIPS = [
 ];
 
 const QUICK_ACTIONS = [
-  { id: 'test', label: 'Mock test', icon: 'create-outline' as const, route: '/tnpsc/test' },
-  { id: 'news', label: 'Daily news', icon: 'newspaper-outline' as const, route: '/current-affairs/day-wise' },
-  { id: 'notes', label: 'Notes', icon: 'book-outline' as const, route: '/tnpsc/book' },
-  { id: 'plans', label: 'Plans', icon: 'diamond-outline' as const, route: '/(tabs)/price' },
+  { id: 'test', label: 'Mock test', icon: 'create-outline' as const, route: '/tnpsc/test', requiresPlan: true },
+  { id: 'news', label: 'Daily news', icon: 'newspaper-outline' as const, route: '/current-affairs/day-wise', requiresPlan: false },
+  { id: 'notes', label: 'Notes', icon: 'book-outline' as const, route: '/tnpsc/book', requiresPlan: true },
+  { id: 'plans', label: 'Plans', icon: 'diamond-outline' as const, route: '/(tabs)/price', requiresPlan: false },
 ];
 
 function courseVisual(title?: string): CourseVisual {
@@ -76,14 +78,20 @@ function ExamTile({ course, onPress }: { course: HomeCourse; onPress: () => void
         <View style={styles.examIconWrap}>
           <Ionicons name={visual.icon} size={22} color="#FFFFFF" />
         </View>
-        <View style={styles.examTag}>
-          <ThemedText style={styles.examTagText}>{visual.tag}</ThemedText>
-        </View>
+        {course.locked ? (
+          <View style={styles.lockBadge}>
+            <Ionicons name="lock-closed" size={12} color="#FFFFFF" />
+          </View>
+        ) : (
+          <View style={styles.examTag}>
+            <ThemedText style={styles.examTagText}>{visual.tag}</ThemedText>
+          </View>
+        )}
         <ThemedText style={styles.examTitle} numberOfLines={1}>
           {course.title}
         </ThemedText>
         <ThemedText style={styles.examSubtitle} numberOfLines={2}>
-          {course.subtitle}
+          {course.locked ? 'Buy a plan to open this course' : course.subtitle}
         </ThemedText>
       </LinearGradient>
     </TouchableOpacity>
@@ -110,30 +118,34 @@ const fallbackCourses: HomeCourse[] = [
     title: 'TNPSC',
     subtitle: 'Tamil Nadu Public Service',
     route: '/tnpsc',
+    locked: true,
   },
   {
     id: '2',
     title: 'RRB',
     subtitle: 'Railway Recruitment',
     route: '/rrb',
+    locked: true,
   },
   {
     id: '3',
     title: 'TNUSRB',
     subtitle: 'Police Recruitment',
     route: '/tnusrb',
+    locked: true,
   },
   {
     id: '4',
     title: 'Current Affairs',
     subtitle: 'Daily updates & news',
     route: '/current-affairs',
+    locked: false,
   },
 ];
 
 export default function HomeScreen() {
   const { colors, isDark } = useTheme();
-  const { user } = useAuth();
+  const { user, hasActiveSubscription, refreshUser } = useAuth();
   const [courses, setCourses] = useState<HomeCourse[]>(fallbackCourses);
   const [stats, setStats] = useState({ dailyStreak: 0, testsCompleted: 0, averageScore: 0 });
   const [continueItem, setContinueItem] = useState<ContinueLearning | null>(null);
@@ -143,7 +155,7 @@ export default function HomeScreen() {
   const greeting = greetingForHour(new Date().getHours());
   const todayLabel = formatToday();
   const tip = STUDY_TIPS[new Date().getDate() % STUDY_TIPS.length];
-  const continueRoute = courses[0]?.route || '/tnpsc';
+  const continueRoute = courses.find((item) => !item.locked)?.route || '/current-affairs';
 
   const courseRows = useMemo(() => {
     const rows: HomeCourse[][] = [];
@@ -153,44 +165,88 @@ export default function HomeScreen() {
     return rows;
   }, [courses]);
 
-  useEffect(() => {
-    listCourses()
-      .then((items) => {
-        if (!items.length) return;
-        setCourses(
-          items.map((item) => {
-            const title = item.name || item.title || 'Course';
-            return {
-              id: item.id,
-              title,
-              subtitle: item.description || item.subtitle || '',
-              route: courseRoute(item) || '/tnpsc',
-            };
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
+
+      const loadCourses = (active: boolean) => {
+        listCourses()
+          .then((items) => {
+            if (cancelled) return;
+            if (!items.length) {
+              setCourses(
+                fallbackCourses.map((item) => ({
+                  ...item,
+                  locked: item.route === '/current-affairs' ? false : !active,
+                })),
+              );
+              return;
+            }
+            setCourses(
+              items.map((item: Course) => {
+                const title = item.name || item.title || 'Course';
+                return {
+                  id: item.id,
+                  title,
+                  subtitle: item.description || item.subtitle || '',
+                  route: courseRoute(item) || '/tnpsc',
+                  locked: isCourseLocked(item, active),
+                };
+              }),
+            );
           })
-        );
-      })
-      .catch(() => undefined);
+          .catch(() => {
+            if (cancelled) return;
+            setCourses(
+              fallbackCourses.map((item) => ({
+                ...item,
+                locked: item.route === '/current-affairs' ? false : !active,
+              })),
+            );
+          });
+      };
 
-    api
-      .get<{ dailyStreak?: number; testsCompleted?: number; averageScore?: number }>('/api/users/me/stats')
-      .then((data) => {
-        if (!data) return;
-        setStats({
-          dailyStreak: data.dailyStreak || 0,
-          testsCompleted: data.testsCompleted || 0,
-          averageScore: Math.round(data.averageScore || 0),
-        });
-      })
-      .catch(() => undefined);
+      loadCourses(hasActiveSubscription);
+      void refreshUser().then((latest) => {
+        if (cancelled) return;
+        loadCourses(Boolean(latest?.hasActiveSubscription));
+      });
 
-    getStreak().then((streak) => {
-      if (streak) setStats((current) => ({ ...current, dailyStreak: streak }));
-    });
-    getContinueLearning().then(setContinueItem);
-  }, [user?.id]);
+      api
+        .get<{ dailyStreak?: number; testsCompleted?: number; averageScore?: number }>('/api/users/me/stats')
+        .then((data) => {
+          if (cancelled || !data) return;
+          setStats({
+            dailyStreak: data.dailyStreak || 0,
+            testsCompleted: data.testsCompleted || 0,
+            averageScore: Math.round(data.averageScore || 0),
+          });
+        })
+        .catch(() => undefined);
+
+      getStreak().then((streak) => {
+        if (!cancelled && streak) setStats((current) => ({ ...current, dailyStreak: streak }));
+      });
+      getContinueLearning().then((item) => {
+        if (!cancelled) setContinueItem(item);
+      });
+
+      return () => {
+        cancelled = true;
+      };
+    }, [hasActiveSubscription, refreshUser]),
+  );
 
   const openRoute = (route: string) => {
     router.push(route as any);
+  };
+
+  const openCourse = (course: HomeCourse) => {
+    if (course.locked) {
+      sendToPlans();
+      return;
+    }
+    openRoute(course.route);
   };
 
   return (
@@ -248,6 +304,10 @@ export default function HomeScreen() {
           <TouchableOpacity
             style={styles.heroButton}
             onPress={async () => {
+              if (!hasActiveSubscription) {
+                sendToPlans();
+                return;
+              }
               const opened = await openContinueItem(continueItem);
               if (!opened) openRoute(continueRoute);
             }}
@@ -287,13 +347,32 @@ export default function HomeScreen() {
           Books, tests and videos for each recruitment
         </ThemedText>
 
+        {!hasActiveSubscription ? (
+          <TouchableOpacity
+            style={[styles.unlockBanner, { backgroundColor: colors.card }]}
+            onPress={() => openRoute('/(tabs)/price')}
+            activeOpacity={0.85}
+          >
+            <View style={[styles.unlockIcon, { backgroundColor: isDark ? '#422006' : '#FFF7ED' }]}>
+              <Ionicons name="diamond-outline" size={18} color="#EA580C" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <ThemedText style={[styles.unlockTitle, { color: colors.text }]}>Unlock course content</ThemedText>
+              <ThemedText style={[styles.unlockSubtitle, { color: colors.textSecondary }]}>
+                Buy a plan. Access stays open until the plan end date.
+              </ThemedText>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+          </TouchableOpacity>
+        ) : null}
+
         {courseRows.map((row, rowIndex) => (
           <View key={`row-${rowIndex}`} style={styles.examRow}>
             {row.map((course) => (
               <ExamTile
                 key={course.id}
                 course={course}
-                onPress={() => openRoute(course.route)}
+                onPress={() => openCourse(course)}
               />
             ))}
             {row.length === 1 ? <View style={styles.examCardWrap} /> : null}
@@ -306,7 +385,13 @@ export default function HomeScreen() {
             <TouchableOpacity
               key={action.id}
               style={[styles.quickCard, { backgroundColor: colors.card }]}
-              onPress={() => openRoute(action.route)}
+              onPress={() => {
+                if (action.requiresPlan && !hasActiveSubscription) {
+                  sendToPlans();
+                  return;
+                }
+                openRoute(action.route);
+              }}
               activeOpacity={0.8}
             >
               <View style={[styles.quickIcon, { backgroundColor: isDark ? '#312E81' : '#EEF2FF' }]}>
@@ -502,6 +587,30 @@ const styles = StyleSheet.create({
     marginTop: 4,
     marginBottom: 14,
   },
+  unlockBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 18,
+    padding: 14,
+    gap: 12,
+    marginBottom: 14,
+  },
+  unlockIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  unlockTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    marginBottom: 2,
+  },
+  unlockSubtitle: {
+    fontSize: 12,
+    lineHeight: 16,
+  },
   examRow: {
     flexDirection: 'row',
     gap: 12,
@@ -530,6 +639,14 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.16)',
     paddingHorizontal: 8,
     paddingVertical: 3,
+    borderRadius: 999,
+    marginBottom: 8,
+  },
+  lockBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: 'rgba(15,23,42,0.28)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
     borderRadius: 999,
     marginBottom: 8,
   },

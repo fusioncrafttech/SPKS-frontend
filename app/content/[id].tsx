@@ -11,7 +11,7 @@ import { PrimaryButton } from '@/components/ui/primary-button';
 import { Screen } from '@/components/ui/screen';
 import { useTheme } from '@/contexts/theme-context';
 import { completeLesson, contentViewUrl, getContent, hasContentPdf, isLockedItem, markLessonProgress, toggleBookmark } from '@/lib/study';
-import { isPremiumRequired, promptPremium } from '@/lib/tests';
+import { handlePremiumError, promptPremium } from '@/lib/tests';
 
 export default function ContentScreen() {
   const { colors } = useTheme();
@@ -30,14 +30,17 @@ export default function ContentScreen() {
         setBookmarked(Boolean(data?.isBookmarked));
         if (data?.lessonId) void markLessonProgress(String(data.lessonId));
         if (isLockedItem(data || {})) {
-          promptPremium('This PDF is locked. Upgrade your plan to open it.');
+          promptPremium('This PDF is locked. Buy a plan to open it.');
           return;
         }
         if (hasContentPdf(data) || data?.viewUrl) {
           setViewUrl(contentViewUrl(id, data));
         }
       } catch (error) {
-        if (isPremiumRequired(error)) return;
+        if (handlePremiumError(error, 'This PDF is locked. Buy a plan to open it.')) {
+          setContent({ isLocked: true });
+          return;
+        }
         Alert.alert('Content', error instanceof Error ? error.message : 'Could not load this item.');
       } finally {
         setLoading(false);

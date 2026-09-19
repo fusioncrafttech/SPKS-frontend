@@ -4,8 +4,10 @@ import { MenuRow, MenuStack } from '@/components/ui/menu-row';
 import { PageHeader } from '@/components/ui/page-header';
 import { Screen, ScreenScroll } from '@/components/ui/screen';
 import { Brand } from '@/constants/brand';
+import { useAuth } from '@/contexts/auth-context';
 import { useCatalogResults } from '@/hooks/use-catalog-results';
 import { loadCourseItems } from '@/lib/catalog';
+import { sendToPlans } from '@/lib/premium';
 
 const UNITS = [
   { id: '1', title: 'Unit – I : General Science', icon: 'flask-outline' as const },
@@ -20,6 +22,14 @@ const UNITS = [
 
 export default function OutsideSourceScreen() {
   const results = useCatalogResults();
+  const { hasActiveSubscription } = useAuth();
+  const openUnit = (title: string) => {
+    if (!hasActiveSubscription) {
+      sendToPlans();
+      return;
+    }
+    results.show(title, () => loadCourseItems('tnpsc', 'outside-sources', { search: title }));
+  };
 
   return (
     <Screen>
@@ -39,7 +49,7 @@ export default function OutsideSourceScreen() {
               title={item.title}
               icon={item.icon}
               index={index}
-              onPress={() => results.show(item.title, () => loadCourseItems('tnpsc', 'outside-sources', { search: item.title }))}
+              onPress={() => openUnit(item.title)}
             />
           ))}
         </MenuStack>

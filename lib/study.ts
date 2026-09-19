@@ -2,7 +2,8 @@ import { router } from 'expo-router';
 
 import { api, asList, toAbsoluteApiUrl } from './api';
 import { CatalogItem, asCatalogItem, getCourse, itemTitle } from './catalog';
-import { promptPremium, startTestFlow } from './tests';
+import { isPremiumRequired, promptPremium } from './premium';
+import { startTestFlow } from './tests';
 
 export type NamedItem = {
   id: string;
@@ -64,7 +65,8 @@ export async function getGroup(groupId: string): Promise<GroupDetail | null> {
       title: String(group.title || group.name || 'Group'),
       subtitle: group.description || group.subtitle || '',
     };
-  } catch {
+  } catch (error) {
+    if (isPremiumRequired(error)) throw error;
     return { id: groupId, title: 'Group' };
   }
 }
@@ -113,7 +115,8 @@ export async function listGroupResource(groupId: string, kind: 'books' | 'notes'
 export async function getContent(contentId: string) {
   try {
     return await api.get<Record<string, any>>(`/api/content/${contentId}`);
-  } catch {
+  } catch (error) {
+    if (isPremiumRequired(error)) throw error;
     return api.get<Record<string, any>>(`/api/current-affairs/${contentId}`);
   }
 }
@@ -243,7 +246,7 @@ export function isLockedItem(item: { isLocked?: boolean }) {
 
 export async function openStudyItem(item: CatalogItem, kind: 'content' | 'video' | 'test' | 'auto' = 'auto') {
   if (item.isLocked) {
-    promptPremium(`${itemTitle(item)} is locked on the free plan.`);
+    promptPremium(`${itemTitle(item)} is locked. Buy a plan to continue.`);
     return;
   }
 

@@ -21,6 +21,7 @@ import { Brand } from '@/constants/brand';
 import { useAuth } from '@/contexts/auth-context';
 import { useTheme } from '@/contexts/theme-context';
 import { forgotPassword } from '@/lib/auth';
+import { postAuthHref } from '@/lib/premium';
 
 export default function LoginScreen() {
   const { colors } = useTheme();
@@ -46,8 +47,8 @@ export default function LoginScreen() {
     if (!validateForm()) return;
     setIsLoading(true);
     try {
-      await login({ email: email.trim(), password });
-      router.replace('/(tabs)');
+      const user = await login({ email: email.trim(), password });
+      router.replace(postAuthHref(Boolean(user.hasActiveSubscription)));
     } catch (error) {
       Alert.alert('Error', error instanceof Error ? error.message : 'Login failed. Please try again.');
     } finally {

@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react';
 
 import { CatalogItem } from '@/lib/catalog';
+import { handlePremiumError } from '@/lib/premium';
 
 export function useCatalogResults() {
   const [visible, setVisible] = useState(false);
@@ -20,6 +21,10 @@ export function useCatalogResults() {
     try {
       setItems(await loader());
     } catch (error) {
+      if (handlePremiumError(error, 'This content is locked. Buy a plan to continue.')) {
+        setVisible(false);
+        return;
+      }
       setEmptyMessage(error instanceof Error ? error.message : 'Could not load content.');
     } finally {
       setLoading(false);

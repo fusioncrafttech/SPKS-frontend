@@ -4,8 +4,10 @@ import { MenuRow, MenuStack } from '@/components/ui/menu-row';
 import { PageHeader } from '@/components/ui/page-header';
 import { Screen, ScreenScroll } from '@/components/ui/screen';
 import { Brand } from '@/constants/brand';
+import { useAuth } from '@/contexts/auth-context';
 import { useCatalogResults } from '@/hooks/use-catalog-results';
 import { loadCourseItems } from '@/lib/catalog';
+import { sendToPlans } from '@/lib/premium';
 
 const NOTES_SUBJECTS = [
   { id: 'mathematics', title: 'Mathematics', icon: 'calculator-outline' as const },
@@ -19,6 +21,14 @@ const NOTES_SUBJECTS = [
 
 export default function NotesScreen() {
   const results = useCatalogResults();
+  const { hasActiveSubscription } = useAuth();
+  const openNotes = (title: string) => {
+    if (!hasActiveSubscription) {
+      sendToPlans();
+      return;
+    }
+    results.show(title, () => loadCourseItems('rrb', 'notes', { search: title }));
+  };
 
   return (
     <Screen>
@@ -38,7 +48,7 @@ export default function NotesScreen() {
               title={item.title}
               icon={item.icon}
               index={index}
-              onPress={() => results.show(item.title, () => loadCourseItems('rrb', 'notes', { search: item.title }))}
+              onPress={() => openNotes(item.title)}
             />
           ))}
         </MenuStack>

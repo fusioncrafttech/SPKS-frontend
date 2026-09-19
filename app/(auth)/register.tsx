@@ -19,6 +19,7 @@ import { TextInput } from '@/components/ui/text-input';
 import { Brand } from '@/constants/brand';
 import { useAuth } from '@/contexts/auth-context';
 import { useTheme } from '@/contexts/theme-context';
+import { postAuthHref } from '@/lib/premium';
 
 interface FormErrors {
   firstName?: string;
@@ -64,14 +65,14 @@ export default function RegisterScreen() {
     if (!validateForm()) return;
     setIsLoading(true);
     try {
-      await register({
+      const user = await register({
         firstName: firstName.trim(),
         lastName: lastName.trim(),
         email: email.trim().toLowerCase(),
         phone: mobileNumber.replace(/\D/g, '') || undefined,
         password,
       });
-      router.replace('/(tabs)');
+      router.replace(postAuthHref(Boolean(user.hasActiveSubscription)));
     } catch (error) {
       Alert.alert('Error', error instanceof Error ? error.message : 'Registration failed. Please try again.');
     } finally {

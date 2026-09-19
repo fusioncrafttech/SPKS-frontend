@@ -5,8 +5,10 @@ import { PageHeader } from '@/components/ui/page-header';
 import { Screen, ScreenScroll } from '@/components/ui/screen';
 import { SectionHeading } from '@/components/ui/section-heading';
 import { Brand } from '@/constants/brand';
+import { useAuth } from '@/contexts/auth-context';
 import { useCatalogResults } from '@/hooks/use-catalog-results';
 import { loadCourseItems } from '@/lib/catalog';
+import { sendToPlans } from '@/lib/premium';
 
 const TAMIL_PARTS = [
   { id: 'tamil-part-a', title: 'பகுதி-அ (இலக்கணம்)', subtitle: 'Part A (Grammar)', icon: 'reader-outline' as const },
@@ -21,7 +23,14 @@ const GK_PARTS = [
 
 export default function NotesScreen() {
   const results = useCatalogResults();
-  const openPart = (title: string) => results.show(title, () => loadCourseItems('tnusrb', 'notes', { search: title }));
+  const { hasActiveSubscription } = useAuth();
+  const openPart = (title: string) => {
+    if (!hasActiveSubscription) {
+      sendToPlans();
+      return;
+    }
+    results.show(title, () => loadCourseItems('tnusrb', 'notes', { search: title }));
+  };
 
   return (
     <Screen>

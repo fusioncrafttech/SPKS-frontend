@@ -10,6 +10,7 @@ import { Screen, ScreenScroll } from '@/components/ui/screen';
 import { Brand } from '@/constants/brand';
 import { useTheme } from '@/contexts/theme-context';
 import { listSubjectChapters, type NamedItem } from '@/lib/study';
+import { handlePremiumError } from '@/lib/premium';
 
 export default function SubjectScreen() {
   const { colors } = useTheme();
@@ -21,7 +22,10 @@ export default function SubjectScreen() {
     if (!id) return;
     listSubjectChapters(id)
       .then(setChapters)
-      .catch(() => setChapters([]))
+      .catch((error) => {
+        if (handlePremiumError(error, 'This course is locked. Buy a plan to continue.')) return;
+        setChapters([]);
+      })
       .finally(() => setLoading(false));
   }, [id]);
 

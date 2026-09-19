@@ -1,131 +1,141 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { router } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
-import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { router, useFocusEffect } from 'expo-router';
+import { useCallback, useMemo, useState } from 'react';
+import { ActivityIndicator, Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { Screen, ScreenScroll } from '@/components/ui/screen';
+import { useAuth } from '@/contexts/auth-context';
 import { useTheme } from '@/contexts/theme-context';
-import { api, asList } from '@/lib/api';
-import { createPaymentOrder, getCurrentSubscription, type Subscription } from '@/lib/payments';
+import { ApiError } from '@/lib/api';
+import {
+  createPaymentOrder,
+  formatSubscriptionDate,
+  getCurrentSubscription,
+  getPaymentConfig,
+  listPlans,
+  subscriptionEndsAt,
+  type PlanRecord,
+  type Subscription,
+} from '@/lib/payments';
 
-type Plan = {
-  id: string;
-  name: string;
-  amount: number;
-  currency: string;
-  durationDays: number;
-  features: string[];
-};
+type Plan = PlanRecord;
 
 function formatAmount(value: number) {
   return value.toLocaleString('en-IN');
 }
 
 function periodCopy(plan: Plan) {
-  if (plan.amount === 0 || plan.durationDays === 0) {
-    return { line: 'Free forever', hint: 'No payment needed' };
+  const interval = (plan.interval || '').toLowerCase();
+  if (interval === '1_month' || (plan.duration > 0 && plan.duration <= 31)) {
+    return { line: 'for 1 month', hint: '30 days of course access' };
   }
-  if (plan.durationDays <= 31) {
-    return { line: 'per month', hint: 'Billed every 30 days' };
+  if (interval === '6_months' || (plan.duration >= 150 && plan.duration < 300)) {
+    return { line: 'for 6 months', hint: '180 days of course access' };
   }
-  if (plan.durationDays >= 300) {
-    const monthly = Math.round(plan.amount / 12);
-    return { line: 'per year', hint: `About ₹${formatAmount(monthly)} per month` };
+  if (interval === '1_year' || plan.duration >= 300) {
+    return { line: 'for 1 year', hint: '365 days of course access' };
   }
-  return { line: `for ${plan.durationDays} days`, hint: 'One-time access' };
+  return { line: `for ${plan.duration} days`, hint: 'One-time access' };
+}
+
+function isSixMonths(plan: Plan) {
+  const interval = (plan.interval || '').toLowerCase();
+  return interval === '6_months' || (plan.duration >= 150 && plan.duration < 300);
 }
 
 function isMonthly(plan: Plan) {
-  return plan.durationDays > 0 && plan.durationDays <= 31;
+  const interval = (plan.interval || '').toLowerCase();
+  return interval === '1_month' || (plan.duration > 0 && plan.duration <= 31);
 }
-
-function parseFeatures(value: unknown): string[] {
-  if (Array.isArray(value)) return value.map(String);
-  if (typeof value === 'string') {
-    try {
-      const parsed = JSON.parse(value);
-      if (Array.isArray(parsed)) return parsed.map(String);
-    } catch {
-      return value.split(',').map((item) => item.trim()).filter(Boolean);
-    }
-  }
-  return [];
-}
-
-const FALLBACK_PLANS: Plan[] = [
-  { id: '1', name: 'Free', amount: 0, currency: 'INR', durationDays: 0, features: ['Limited tests', 'Daily current affairs'] },
-  { id: '2', name: 'Monthly', amount: 299, currency: 'INR', durationDays: 30, features: ['All courses', 'Unlimited tests', 'Premium notes'] },
-  { id: '3', name: 'Yearly', amount: 2499, currency: 'INR', durationDays: 365, features: ['All courses', 'Unlimited tests', 'Premium notes', 'Priority support'] },
-];
 
 export default function PriceScreen() {
   const { colors, isDark } = useTheme();
-  const [pricingPlans, setPricingPlans] = useState(FALLBACK_PLANS);
-  const [selectedId, setSelectedId] = useState(FALLBACK_PLANS[1].id);
-  const [subscription, setSubscription] = useState<Subscription | null>(null);
+  const { hasActiveSubscription, subscription: authSubscription, refreshUser } = useAuth();
+  const [pricingPlans, setPricingPlans] = useState<Plan[]>([]);
+  const [selectedId, setSelectedId] = useState('');
+  const [subscription, setSubscription] = useState<Subscription | null>(authSubscription);
+  const [loading, setLoading] = useState(true);
   const [paying, setPaying] = useState(false);
 
-  useEffect(() => {
-    api.get<Record<string, any>[]>('/api/plans')
-      .then((items) => {
-        const list = asList(items);
-        if (!list.length) return;
-        const next = list.map((plan) => ({
-          id: String(plan.id),
-          name: plan.name || 'Plan',
-          amount: Number(plan.price) || 0,
-          currency: String(plan.currency || 'INR'),
-          durationDays: Number(plan.duration) || 0,
-          features: parseFeatures(plan.features).length ? parseFeatures(plan.features) : ['Course access'],
-        }));
-        setPricingPlans(next);
-        const monthly = next.find(isMonthly);
-        setSelectedId(monthly?.id || next[0]?.id);
-      })
-      .catch(() => undefined);
-    getCurrentSubscription().then(setSubscription);
-  }, []);
+  const load = useCallback(async () => {
+    try {
+      const [plans, currentUser, currentSub] = await Promise.all([
+        listPlans(),
+        refreshUser(),
+        getCurrentSubscription(),
+      ]);
+      if (plans.length) {
+        setPricingPlans(plans);
+        const monthly = plans.find(isMonthly);
+        setSelectedId((current) => current || monthly?.id || plans[0]?.id || '');
+      }
+      setSubscription(currentUser?.subscription || currentSub);
+    } catch (error) {
+      Alert.alert('Plans', error instanceof Error ? error.message : 'Could not load plans.');
+    } finally {
+      setLoading(false);
+    }
+  }, [refreshUser]);
+
+  useFocusEffect(
+    useCallback(() => {
+      void load();
+    }, [load]),
+  );
 
   const selected = useMemo(
     () => pricingPlans.find((plan) => plan.id === selectedId) || pricingPlans[0],
-    [pricingPlans, selectedId]
+    [pricingPlans, selectedId],
   );
 
+  const endsAtLabel = formatSubscriptionDate(subscriptionEndsAt(subscription));
+  const planLabel = subscription?.planName || subscription?.name;
+  const daysLeft = subscription?.daysRemaining;
+  const activeUntilCopy = daysLeft !== undefined
+    ? `${planLabel || 'Your plan'} · ${daysLeft} day${daysLeft === 1 ? '' : 's'} left`
+    : endsAtLabel
+      ? `${planLabel || 'Your plan'} is active until ${endsAtLabel}`
+      : `${planLabel || 'Your plan'} is still active`;
+
   const handleGetStarted = async (plan: Plan) => {
-    if (plan.amount === 0) {
-      Alert.alert('Free plan', 'You already have access to the free plan.');
+    if (hasActiveSubscription) {
+      Alert.alert('Plan active', `Your plan is still active until ${endsAtLabel || 'the end date'}. You cannot buy another plan yet.`);
       return;
     }
     setPaying(true);
     try {
-      const order = await createPaymentOrder(plan.id);
-      const keyId = order.keyId || process.env.EXPO_PUBLIC_RAZORPAY_KEY_ID || '';
-      if (!keyId || !order.razorpayOrderId) {
+      const [order, config] = await Promise.all([createPaymentOrder(plan.id), getPaymentConfig()]);
+      const keyId = order.keyId || config?.keyId || process.env.EXPO_PUBLIC_RAZORPAY_KEY_ID || '';
+      if (!keyId || !order.orderId) {
         Alert.alert('Payment', 'Checkout is not configured yet. The order was created on the server.');
         return;
       }
-      const amount = order.amount > 0 && order.amount < 5000 ? Math.round(order.amount * 100) : order.amount;
       router.push({
         pathname: '/checkout',
         params: {
           keyId,
-          orderId: order.razorpayOrderId,
-          amount: String(amount),
-          currency: order.currency || 'INR',
-          name: plan.name,
+          orderId: order.orderId,
+          amount: String(order.amount),
+          currency: order.currency || config?.currency || 'INR',
+          name: order.name || 'SPKS Exams',
+          description: order.description || plan.name,
         },
       } as any);
     } catch (error) {
+      if (error instanceof ApiError && error.status === 409) {
+        Alert.alert('Plan active', error.message || `Your plan is still active until ${endsAtLabel || 'the end date'}.`);
+        return;
+      }
       Alert.alert('Payment', error instanceof Error ? error.message : 'Payment is not available yet.');
     } finally {
       setPaying(false);
     }
   };
 
-  const ctaLabel = selected?.amount === 0
-    ? 'Continue with Free'
-    : `Continue · ₹${formatAmount(selected?.amount || 0)}`;
+  const ctaLabel = hasActiveSubscription
+    ? 'Plan already active'
+    : `Pay · ₹${formatAmount(selected?.price || 0)}`;
 
   return (
     <Screen>
@@ -133,111 +143,130 @@ export default function PriceScreen() {
         <ThemedText style={[styles.kicker, { color: colors.textSecondary }]}>Membership</ThemedText>
         <ThemedText style={[styles.pageTitle, { color: colors.text }]}>Pick a plan</ThemedText>
         <ThemedText style={[styles.pageHint, { color: colors.textSecondary }]}>
-          Monthly billing, or save more with a yearly plan
+          1 month, 6 months, or 1 year. Course access ends on the plan date.
         </ThemedText>
 
-        {subscription?.planName || subscription?.name ? (
+        {hasActiveSubscription && planLabel ? (
           <View style={[styles.currentPlan, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <ThemedText style={[styles.currentLabel, { color: colors.textSecondary }]}>You are on</ThemedText>
-            <ThemedText style={[styles.currentName, { color: colors.text }]}>
-              {subscription.planName || subscription.name}
+            <ThemedText style={[styles.currentName, { color: colors.text }]}>{planLabel}</ThemedText>
+            <ThemedText style={[styles.currentHint, { color: colors.textSecondary }]}>{activeUntilCopy}</ThemedText>
+          </View>
+        ) : (
+          <View style={[styles.currentPlan, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <ThemedText style={[styles.currentLabel, { color: colors.textSecondary }]}>No active plan</ThemedText>
+            <ThemedText style={[styles.currentName, { color: colors.text }]}>Pay to open courses</ThemedText>
+            <ThemedText style={[styles.currentHint, { color: colors.textSecondary }]}>
+              Home can show the course list. Opening a course needs a plan.
             </ThemedText>
           </View>
-        ) : null}
+        )}
 
-        {pricingPlans.map((plan) => {
-          const selectedPlan = plan.id === selectedId;
-          const copy = periodCopy(plan);
-          const highlight = isMonthly(plan);
+        {loading ? (
+          <View style={styles.loader}>
+            <ActivityIndicator color={colors.tint} />
+          </View>
+        ) : pricingPlans.length ? (
+          pricingPlans.map((plan) => {
+            const selectedPlan = plan.id === selectedId;
+            const copy = periodCopy(plan);
+            const highlight = isSixMonths(plan);
 
-          return (
-            <TouchableOpacity
-              key={plan.id}
-              style={[
-                styles.planCard,
-                {
-                  borderColor: selectedPlan ? '#4338CA' : colors.border,
-                  backgroundColor: selectedPlan
-                    ? isDark
-                      ? '#1E1B4B'
-                      : '#E0E7FF'
-                    : colors.card,
-                },
-              ]}
-              onPress={() => setSelectedId(plan.id)}
-              activeOpacity={0.9}
-            >
-              <View style={styles.planTop}>
-                <View style={styles.planIdentity}>
-                  <View
-                    style={[
-                      styles.radio,
-                      {
-                        borderColor: selectedPlan ? '#4338CA' : colors.textMuted,
-                        backgroundColor: selectedPlan ? '#4338CA' : 'transparent',
-                      },
-                    ]}
-                  >
-                    {selectedPlan ? <View style={styles.radioDot} /> : null}
-                  </View>
-                  <ThemedText style={[styles.planName, { color: selectedPlan && isDark ? '#FFFFFF' : colors.text }]}>
-                    {plan.name}
-                  </ThemedText>
-                </View>
-                {highlight ? (
-                  <View style={styles.bestChip}>
-                    <ThemedText style={styles.bestChipText}>Best value</ThemedText>
-                  </View>
-                ) : null}
-              </View>
-
-              <View style={styles.priceBlock}>
-                {plan.amount === 0 ? (
-                  <Text style={[styles.freeLabel, { color: selectedPlan && isDark ? '#FFFFFF' : colors.text }]}>
-                    Free
-                  </Text>
-                ) : (
-                  <View style={styles.amountRow}>
-                    <Text style={[styles.currency, { color: selectedPlan && isDark ? '#C7D2FE' : colors.textSecondary }]}>
-                      ₹
-                    </Text>
-                    <Text
-                      style={[styles.amount, { color: selectedPlan && isDark ? '#FFFFFF' : colors.text }]}
-                      numberOfLines={1}
+            return (
+              <TouchableOpacity
+                key={plan.id}
+                style={[
+                  styles.planCard,
+                  {
+                    borderColor: selectedPlan ? '#4338CA' : colors.border,
+                    backgroundColor: selectedPlan
+                      ? isDark
+                        ? '#1E1B4B'
+                        : '#E0E7FF'
+                      : colors.card,
+                  },
+                ]}
+                onPress={() => setSelectedId(plan.id)}
+                activeOpacity={0.9}
+              >
+                <View style={styles.planTop}>
+                  <View style={styles.planIdentity}>
+                    <View
+                      style={[
+                        styles.radio,
+                        {
+                          borderColor: selectedPlan ? '#4338CA' : colors.textMuted,
+                          backgroundColor: selectedPlan ? '#4338CA' : 'transparent',
+                        },
+                      ]}
                     >
-                      {formatAmount(plan.amount)}
-                    </Text>
+                      {selectedPlan ? <View style={styles.radioDot} /> : null}
+                    </View>
+                    <ThemedText style={[styles.planName, { color: selectedPlan && isDark ? '#FFFFFF' : colors.text }]}>
+                      {plan.name}
+                    </ThemedText>
                   </View>
-                )}
-                <Text style={[styles.period, { color: selectedPlan && isDark ? '#C7D2FE' : colors.textSecondary }]}>
-                  {copy.line}
-                </Text>
-                <Text style={[styles.periodHint, { color: selectedPlan && isDark ? '#A5B4FC' : colors.textMuted }]}>
-                  {copy.hint}
-                </Text>
-              </View>
-
-              {plan.features.map((feature) => (
-                <View key={feature} style={styles.featureRow}>
-                  <Ionicons name="checkmark-circle" size={16} color={selectedPlan ? '#4338CA' : colors.tint} />
-                  <ThemedText style={[styles.featureText, { color: selectedPlan && isDark ? '#E0E7FF' : colors.text }]}>
-                    {feature}
-                  </ThemedText>
+                  {highlight ? (
+                    <View style={styles.bestChip}>
+                      <ThemedText style={styles.bestChipText}>Popular</ThemedText>
+                    </View>
+                  ) : null}
                 </View>
-              ))}
-            </TouchableOpacity>
-          );
-        })}
 
-        <TouchableOpacity
-          style={styles.cta}
-          onPress={() => selected && handleGetStarted(selected)}
-          activeOpacity={0.88}
-          disabled={paying}
-        >
-          <ThemedText style={styles.ctaText}>{paying ? 'Opening checkout...' : ctaLabel}</ThemedText>
-          <Ionicons name="arrow-forward" size={16} color="#FFFFFF" />
-        </TouchableOpacity>
+                <View style={styles.priceBlock}>
+                  {plan.price === 0 ? (
+                    <Text style={[styles.freeLabel, { color: selectedPlan && isDark ? '#FFFFFF' : colors.text }]}>
+                      Free
+                    </Text>
+                  ) : (
+                    <View style={styles.amountRow}>
+                      <Text style={[styles.currency, { color: selectedPlan && isDark ? '#C7D2FE' : colors.textSecondary }]}>
+                        ₹
+                      </Text>
+                      <Text
+                        style={[styles.amount, { color: selectedPlan && isDark ? '#FFFFFF' : colors.text }]}
+                        numberOfLines={1}
+                      >
+                        {formatAmount(plan.price)}
+                      </Text>
+                    </View>
+                  )}
+                  <Text style={[styles.period, { color: selectedPlan && isDark ? '#C7D2FE' : colors.textSecondary }]}>
+                    {copy.line}
+                  </Text>
+                  <Text style={[styles.periodHint, { color: selectedPlan && isDark ? '#A5B4FC' : colors.textMuted }]}>
+                    {copy.hint}
+                  </Text>
+                </View>
+
+                {plan.features.map((feature) => (
+                  <View key={feature} style={styles.featureRow}>
+                    <Ionicons name="checkmark-circle" size={16} color={selectedPlan ? '#4338CA' : colors.tint} />
+                    <ThemedText style={[styles.featureText, { color: selectedPlan && isDark ? '#E0E7FF' : colors.text }]}>
+                      {feature}
+                    </ThemedText>
+                  </View>
+                ))}
+              </TouchableOpacity>
+            );
+          })
+        ) : (
+          <ThemedText style={{ color: colors.textSecondary, textAlign: 'center', marginVertical: 24 }}>
+            No plans are available yet.
+          </ThemedText>
+        )}
+
+        {selected ? (
+          <TouchableOpacity
+            style={[styles.cta, hasActiveSubscription ? { opacity: 0.6 } : null]}
+            onPress={() => handleGetStarted(selected)}
+            activeOpacity={0.88}
+            disabled={paying || loading || hasActiveSubscription}
+          >
+            <ThemedText style={styles.ctaText}>{paying ? 'Opening checkout...' : ctaLabel}</ThemedText>
+            <Ionicons name="arrow-forward" size={16} color="#FFFFFF" />
+          </TouchableOpacity>
+        ) : null}
 
         <TouchableOpacity onPress={() => router.push('/profile/payments' as any)} style={{ alignItems: 'center', marginTop: 16 }}>
           <ThemedText style={{ color: colors.tint, fontWeight: '700' }}>View payment history</ThemedText>
@@ -246,7 +275,7 @@ export default function PriceScreen() {
         <View style={styles.perkRow}>
           <ThemedText style={[styles.perk, { color: colors.textMuted }]}>Secure payment</ThemedText>
           <ThemedText style={[styles.perkDot, { color: colors.textMuted }]}>·</ThemedText>
-          <ThemedText style={[styles.perk, { color: colors.textMuted }]}>Cancel anytime</ThemedText>
+          <ThemedText style={[styles.perk, { color: colors.textMuted }]}>Cancel checkout to stay here</ThemedText>
         </View>
       </ScreenScroll>
     </Screen>
@@ -287,6 +316,14 @@ const styles = StyleSheet.create({
   currentName: {
     fontSize: 18,
     fontWeight: '800',
+  },
+  currentHint: {
+    fontSize: 13,
+    marginTop: 4,
+  },
+  loader: {
+    paddingVertical: 32,
+    alignItems: 'center',
   },
   planCard: {
     borderRadius: 22,

@@ -4,8 +4,10 @@ import { MenuRow, MenuStack } from '@/components/ui/menu-row';
 import { PageHeader } from '@/components/ui/page-header';
 import { Screen, ScreenScroll } from '@/components/ui/screen';
 import { Brand } from '@/constants/brand';
+import { useAuth } from '@/contexts/auth-context';
 import { useCatalogResults } from '@/hooks/use-catalog-results';
 import { loadCourseItems } from '@/lib/catalog';
+import { sendToPlans } from '@/lib/premium';
 
 const VIDEO_CATEGORIES = [
   { id: 'mathematics', title: 'Mathematics', icon: 'calculator-outline' as const },
@@ -19,6 +21,14 @@ const VIDEO_CATEGORIES = [
 
 export default function VideoScreen() {
   const results = useCatalogResults();
+  const { hasActiveSubscription } = useAuth();
+  const openVideos = (item: (typeof VIDEO_CATEGORIES)[number]) => {
+    if (!hasActiveSubscription) {
+      sendToPlans();
+      return;
+    }
+    results.show(item.title, () => loadCourseItems('rrb', 'videos', { category: item.id, search: item.title }));
+  };
 
   return (
     <Screen>
@@ -39,7 +49,7 @@ export default function VideoScreen() {
               subtitle="Video tutorials available"
               icon={item.icon}
               index={index}
-              onPress={() => results.show(item.title, () => loadCourseItems('rrb', 'videos', { category: item.id, search: item.title }))}
+              onPress={() => openVideos(item)}
             />
           ))}
         </MenuStack>

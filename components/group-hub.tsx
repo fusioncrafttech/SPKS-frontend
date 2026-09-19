@@ -8,6 +8,10 @@ import { MenuRow, MenuStack } from '@/components/ui/menu-row';
 import { PageHeader } from '@/components/ui/page-header';
 import { Screen, ScreenScroll } from '@/components/ui/screen';
 import { useCatalogResults } from '@/hooks/use-catalog-results';
+import { EmptyNote } from '@/components/ui/empty-note';
+import { PrimaryButton } from '@/components/ui/primary-button';
+import { useAuth } from '@/contexts/auth-context';
+import { handlePremiumError } from '@/lib/premium';
 import { getGroup, listGroupClasses, listGroupResource, type GroupDetail } from '@/lib/study';
 import { listGroupTests } from '@/lib/tests';
 
@@ -20,22 +24,33 @@ type Props = {
 
 export function GroupHubScreen({ courseSlug, gradient }: Props) {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const { hasActiveSubscription } = useAuth();
   const results = useCatalogResults();
   const groupId = String(id || '');
   const [group, setGroup] = useState<GroupDetail | null>(null);
   const [hasClasses, setHasClasses] = useState(courseSlug === 'tnpsc');
   const [loading, setLoading] = useState(true);
+  const [premiumBlocked, setPremiumBlocked] = useState(false);
 
   useEffect(() => {
     if (!groupId) return;
+    if (!hasActiveSubscription) {
+      setPremiumBlocked(true);
+      setLoading(false);
+      return;
+    }
     Promise.all([getGroup(groupId), listGroupClasses(groupId)])
       .then(([detail, classes]) => {
         setGroup(detail);
         setHasClasses(classes.length > 0);
       })
-      .catch(() => undefined)
+      .catch((error) => {
+        if (handlePremiumError(error)) {
+          setPremiumBlocked(true);
+        }
+      })
       .finally(() => setLoading(false));
-  }, [groupId]);
+  }, [groupId, hasActiveSubscription]);
 
   const openResource = (kind: 'notes' | 'books' | 'outside-sources' | 'videos' | 'tests', title: string) => {
     results.show(title, () => (kind === 'tests' ? listGroupTests(groupId) : listGroupResource(groupId, kind)));
@@ -58,6 +73,14 @@ export function GroupHubScreen({ courseSlug, gradient }: Props) {
         {loading ? (
           <View style={{ paddingVertical: 24 }}>
             <ActivityIndicator color="#4338CA" />
+          </View>
+        ) : premiumBlocked ? (
+          <View style={{ gap: 16 }}>
+            <EmptyNote
+              title="Plan required"
+              message="An active plan is required to open courses. Choose 1 month, 6 months, or 1 year."
+            />
+            <PrimaryButton title="View plans" onPress={() => router.push('/(tabs)/price')} />
           </View>
         ) : (
           <MenuStack>
