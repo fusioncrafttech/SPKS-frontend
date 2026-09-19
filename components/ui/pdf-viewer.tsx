@@ -34,7 +34,8 @@ function pdfHtml(base64: string) {
     <style>
       html, body { margin: 0; padding: 0; background: #525659; }
       #viewer { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 8px 0; }
-      canvas { width: 100%; height: auto; background: #fff; }
+      .page-slot { width: 100%; min-height: 70vh; }
+      canvas { width: 100%; height: auto; background: #fff; display: block; }
       .status { color: #fff; font-family: sans-serif; padding: 24px; text-align: center; }
     </style>
   </head>
@@ -42,25 +43,49 @@ function pdfHtml(base64: string) {
     <div id="status" class="status">Opening PDF…</div>
     <div id="viewer"></div>
     <script>
-      pdfjsLib.disableWorker = true;
+      pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
       const status = document.getElementById('status');
       const viewer = document.getElementById('viewer');
       const data = atob(${JSON.stringify(base64)});
       const bytes = new Uint8Array(data.length);
       for (let i = 0; i < data.length; i += 1) bytes[i] = data.charCodeAt(i);
-      pdfjsLib.getDocument({ data: bytes }).promise.then(async (pdf) => {
+      pdfjsLib.getDocument({ data: bytes }).promise.then((pdf) => {
         status.remove();
-        for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        const rendered = new Set();
+        async function renderPage(pageNumber) {
+          if (rendered.has(pageNumber)) return;
+          rendered.add(pageNumber);
+          const slot = document.getElementById('page-' + pageNumber);
+          if (!slot) return;
           const page = await pdf.getPage(pageNumber);
           const unscaled = page.getViewport({ scale: 1 });
           const scale = (window.innerWidth - 8) / unscaled.width;
-          const viewport = page.getViewport({ scale: scale * (window.devicePixelRatio || 1) });
+          const viewport = page.getViewport({ scale: scale * dpr });
           const canvas = document.createElement('canvas');
           canvas.width = viewport.width;
           canvas.height = viewport.height;
-          viewer.appendChild(canvas);
+          slot.innerHTML = '';
+          slot.style.minHeight = '0';
+          slot.appendChild(canvas);
           await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
         }
+        const observer = new IntersectionObserver((entries) => {
+          entries.forEach((entry) => {
+            if (!entry.isIntersecting) return;
+            const pageNumber = Number(entry.target.getAttribute('data-page'));
+            renderPage(pageNumber);
+          });
+        }, { rootMargin: '600px 0px' });
+        for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
+          const slot = document.createElement('div');
+          slot.className = 'page-slot';
+          slot.id = 'page-' + pageNumber;
+          slot.setAttribute('data-page', String(pageNumber));
+          viewer.appendChild(slot);
+          observer.observe(slot);
+        }
+        renderPage(1);
       }).catch(() => {
         status.textContent = 'Could not display this PDF.';
       });
@@ -88,6 +113,7 @@ export function PdfViewer({ uri }: Props) {
 
   useEffect(() => {
     let cancelled = false;
+    const controller = new AbortController();
 
     (async () => {
       setLoading(true);
@@ -103,7 +129,8 @@ export function PdfViewer({ uri }: Props) {
           return;
         }
 
-        const response = await apiFetch(sourceUri);
+        const response = await apiFetch(sourceUri, { signal: controller.signal });
+        if (cancelled) return;
         if (response.status === 403) {
           promptPremium('This file is locked. Buy a plan to view it.');
           throw new ApiError('Premium required', 403, undefined, 'PREMIUM_REQUIRED');
@@ -114,7 +141,7 @@ export function PdfViewer({ uri }: Props) {
         const bytes = new Uint8Array(await response.arrayBuffer());
         if (!cancelled) setHtml(pdfHtml(uint8ToBase64(bytes)));
       } catch (caught) {
-        if (cancelled || isPremiumRequired(caught)) return;
+        if (cancelled || isPremiumRequired(caught) || (caught instanceof Error && caught.name === 'AbortError')) return;
         setError(caught instanceof Error ? caught.message : 'Could not open this PDF.');
       } finally {
         if (!cancelled) setLoading(false);
@@ -123,6 +150,7 @@ export function PdfViewer({ uri }: Props) {
 
     return () => {
       cancelled = true;
+      controller.abort();
     };
   }, [sourceUri, useStreamViewer]);
 

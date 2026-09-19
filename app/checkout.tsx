@@ -130,7 +130,7 @@ export default function CheckoutScreen() {
           hasActiveSubscription: true,
           subscription: verified.subscription,
         });
-        const latest = await refreshUser();
+        const latest = await refreshUser({ force: true });
         const endsAt = formatSubscriptionDate(subscriptionEndsAt(latest?.subscription || verified.subscription));
         router.replace('/(tabs)');
         Alert.alert(

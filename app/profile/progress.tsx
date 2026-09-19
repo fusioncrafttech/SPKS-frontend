@@ -44,10 +44,17 @@ export default function ProgressScreen() {
   const [showStateModal, setShowStateModal] = useState(false);
 
   useEffect(() => {
-    api.get<Record<string, any>[]>('/api/users/me/course-progress')
-      .then((items) => {
-        const list = asList(items);
-        if (!list.length) return;
+    let cancelled = false;
+    Promise.all([
+      api.get<Record<string, any>[]>('/api/users/me/course-progress').catch(() => null),
+      api.get<{ testsCompleted?: number; averageScore?: number; dailyStreak?: number }>('/api/users/me/stats').catch(() => null),
+      api.get<Record<string, any>>('/api/users/me/progress').catch(() => null),
+      getStreak(),
+      getActivity(),
+    ]).then(([courseProgress, statsData, overall, streak, activityItems]) => {
+      if (cancelled) return;
+      const list = asList(courseProgress);
+      if (list.length) {
         setProgressData(list.map((item, index) => ({
           id: String(item.id || item.courseId || index),
           course: item.course || item.courseName || item.name || 'Course',
@@ -55,38 +62,18 @@ export default function ProgressScreen() {
           total: Number(item.total ?? item.totalLessons ?? item.totalQuestions ?? 1) || 1,
           color: [Brand.indigoSoft[0], Brand.teal[0], Brand.blue[0], Brand.orange[0]][index % 4],
         })));
-      })
-      .catch(() => undefined);
-
-    api.get<{ testsCompleted?: number; averageScore?: number; dailyStreak?: number }>('/api/users/me/stats')
-      .then((data) => {
-        if (!data) return;
-        setStats({
-          testsCompleted: data.testsCompleted || 0,
-          averageScore: Math.round(data.averageScore || 0),
-          dailyStreak: data.dailyStreak || 0,
-        });
-      })
-      .catch(() => undefined);
-
-    api.get<Record<string, any>>('/api/users/me/progress')
-      .then((data) => {
-        if (!data) return;
-        if (data.testsCompleted || data.averageScore || data.dailyStreak) {
-          setStats((current) => ({
-            testsCompleted: Number(data.testsCompleted ?? current.testsCompleted),
-            averageScore: Math.round(Number(data.averageScore ?? current.averageScore)),
-            dailyStreak: Number(data.dailyStreak ?? current.dailyStreak),
-          }));
-        }
-      })
-      .catch(() => undefined);
-
-    getStreak().then((streak) => {
-      if (streak) setStats((current) => ({ ...current, dailyStreak: streak }));
+      }
+      setStats({
+        testsCompleted: Number(overall?.testsCompleted ?? statsData?.testsCompleted ?? 0),
+        averageScore: Math.round(Number(overall?.averageScore ?? statsData?.averageScore ?? 0)),
+        dailyStreak: Number(streak || overall?.dailyStreak || statsData?.dailyStreak || 0),
+      });
+      setActivity(activityItems);
     });
-    getActivity().then(setActivity);
-  }, [colors, user?.id]);
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id]);
 
   const selectState = async (state: string) => {
     setSelectedState(state);

@@ -48,6 +48,36 @@ const COURSE_ROUTES: { match: string; route: '/tnpsc' | '/rrb' | '/tnusrb' | '/c
   { match: 'current', route: '/current-affairs' },
 ];
 
+let memoryCourses: Course[] | null = null;
+
+function courseMatches(course: Course, idOrSlug: string) {
+  const needle = idOrSlug.toLowerCase();
+  return (
+    course.id === idOrSlug ||
+    course.id.toLowerCase() === needle ||
+    course.slug?.toLowerCase() === needle ||
+    `${course.name || ''} ${course.title || ''}`.toLowerCase().includes(needle)
+  );
+}
+
+function rememberCourses(items: Course[]) {
+  memoryCourses = items;
+}
+
+function rememberCourse(course: Course) {
+  if (!memoryCourses) {
+    memoryCourses = [course];
+    return;
+  }
+  const index = memoryCourses.findIndex((item) => item.id === course.id);
+  if (index >= 0) memoryCourses[index] = { ...memoryCourses[index], ...course };
+  else memoryCourses.push(course);
+}
+
+export function clearCourseMemory() {
+  memoryCourses = null;
+}
+
 export function courseRoute(course: Pick<Course, 'id' | 'name' | 'slug' | 'title'>) {
   const key = `${course.slug || ''} ${course.name || ''} ${course.title || ''}`.toLowerCase();
   const match = COURSE_ROUTES.find((item) => key.includes(item.match));
@@ -67,14 +97,22 @@ export function isCourseLocked(course: Course, hasActiveSubscription: boolean) {
 }
 
 export async function listCourses() {
-  return asList<Course>(await api.get<Course[]>('/api/courses', { limit: 50 }));
+  const items = asList<Course>(await api.get<Course[]>('/api/courses', { limit: 50 }));
+  rememberCourses(items);
+  return items;
 }
 
 export async function getCourse(idOrSlug: string) {
+  const cached = memoryCourses?.find((course) => courseMatches(course, idOrSlug));
+  if (cached) return cached;
+
   try {
     const data = await api.get<any>(`/api/courses/${idOrSlug}`);
     const course = data?.id ? data : data?.course || (Array.isArray(data) ? data[0] : null);
-    if (course?.id) return course as Course;
+    if (course?.id) {
+      rememberCourse(course as Course);
+      return course as Course;
+    }
   } catch (error) {
     if (isPremiumRequired(error)) throw error;
   }
@@ -82,14 +120,8 @@ export async function getCourse(idOrSlug: string) {
 }
 
 export async function findCourse(slug: string) {
-  const courses = await listCourses();
-  const needle = slug.toLowerCase();
-  return (
-    courses.find((course) => course.id === slug) ||
-    courses.find((course) => course.slug?.toLowerCase() === needle) ||
-    courses.find((course) => `${course.name || ''} ${course.title || ''}`.toLowerCase().includes(needle)) ||
-    null
-  );
+  const courses = memoryCourses ?? (await listCourses());
+  return courses.find((course) => courseMatches(course, slug)) || null;
 }
 
 export async function loadCourseItems(slug: string, kind: CourseKind, query?: Record<string, string | number | undefined>) {

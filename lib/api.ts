@@ -4,6 +4,32 @@ import { Platform } from 'react-native';
 
 const ACCESS_TOKEN_KEY = 'spks_access_token';
 const REFRESH_TOKEN_KEY = 'spks_refresh_token';
+const GET_CACHE_TTL_MS = 45_000;
+
+let memoryAccessToken: string | null | undefined;
+const getCache = new Map<string, { expiresAt: number; value: unknown }>();
+const inflightGets = new Map<string, Promise<unknown>>();
+
+function requestMethod(options: RequestInit = {}) {
+  return (options.method || 'GET').toUpperCase();
+}
+
+function shouldInvalidateCache(path: string, method: string) {
+  if (method === 'GET' || method === 'HEAD') return false;
+  return !/\/(answers|progress|complete|view)(\?|$)/.test(path);
+}
+
+export function invalidateApiCache() {
+  getCache.clear();
+  inflightGets.clear();
+}
+
+function isAbortError(error: unknown) {
+  return (
+    (typeof DOMException !== 'undefined' && error instanceof DOMException && error.name === 'AbortError') ||
+    (error instanceof Error && error.name === 'AbortError')
+  );
+}
 
 function expoLanHost() {
   const hostUri = Constants.expoConfig?.hostUri || Constants.linkingUri || '';
@@ -67,16 +93,21 @@ export function asList<T>(value: T[] | { items?: T[] } | null | undefined): T[] 
 }
 
 export async function setTokens(accessToken: string, refreshToken?: string) {
+  memoryAccessToken = accessToken;
   await AsyncStorage.setItem(ACCESS_TOKEN_KEY, accessToken);
   if (refreshToken) await AsyncStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
 }
 
 export async function clearTokens() {
+  memoryAccessToken = null;
+  invalidateApiCache();
   await AsyncStorage.multiRemove([ACCESS_TOKEN_KEY, REFRESH_TOKEN_KEY]);
 }
 
 export async function getAccessToken() {
-  return AsyncStorage.getItem(ACCESS_TOKEN_KEY);
+  if (memoryAccessToken !== undefined) return memoryAccessToken;
+  memoryAccessToken = await AsyncStorage.getItem(ACCESS_TOKEN_KEY);
+  return memoryAccessToken;
 }
 
 export async function getRefreshToken() {
@@ -140,7 +171,8 @@ export async function apiFetch(pathOrUrl: string, options: RequestInit = {}, ret
   let response: Response;
   try {
     response = await fetch(url, { ...options, headers });
-  } catch {
+  } catch (error) {
+    if (isAbortError(error) || options.signal?.aborted) throw error;
     throw new ApiError('Cannot reach the server. Check that the backend is running and EXPO_PUBLIC_API_URL is set.', 0);
   }
 
@@ -151,7 +183,7 @@ export async function apiFetch(pathOrUrl: string, options: RequestInit = {}, ret
   return response;
 }
 
-export async function apiRequest<T>(path: string, options: RequestInit = {}, retry = true): Promise<T> {
+async function sendApiRequest<T>(path: string, options: RequestInit = {}, retry = true): Promise<T> {
   const accessToken = await getAccessToken();
   const headers = new Headers(options.headers);
   if (!(options.body instanceof FormData)) {
@@ -162,12 +194,13 @@ export async function apiRequest<T>(path: string, options: RequestInit = {}, ret
   let response: Response;
   try {
     response = await fetch(`${API_URL}${path}`, { ...options, headers });
-  } catch {
+  } catch (error) {
+    if (isAbortError(error) || options.signal?.aborted) throw error;
     throw new ApiError('Cannot reach the server. Check that the backend is running and EXPO_PUBLIC_API_URL is set.', 0);
   }
 
   if (response.status === 401 && retry && (await refreshAccessToken())) {
-    return apiRequest<T>(path, options, false);
+    return sendApiRequest<T>(path, options, false);
   }
 
   const text = await response.text();
@@ -188,7 +221,38 @@ export async function apiRequest<T>(path: string, options: RequestInit = {}, ret
     );
   }
 
-  return getPayload(payload as ApiResponse<T> | T);
+  const result = getPayload(payload as ApiResponse<T> | T);
+  const method = requestMethod(options);
+  if (method === 'GET') {
+    getCache.set(`GET:${path}`, { value: result, expiresAt: Date.now() + GET_CACHE_TTL_MS });
+  } else if (shouldInvalidateCache(path, method)) {
+    invalidateApiCache();
+  }
+  return result;
+}
+
+export async function apiRequest<T>(path: string, options: RequestInit = {}, retry = true): Promise<T> {
+  const method = requestMethod(options);
+  const cacheKey = `${method}:${path}`;
+
+  if (method === 'GET' && retry) {
+    const cached = getCache.get(cacheKey);
+    if (cached && cached.expiresAt > Date.now()) {
+      return cached.value as T;
+    }
+    const pending = inflightGets.get(cacheKey);
+    if (pending) return pending as Promise<T>;
+  }
+
+  const request = sendApiRequest<T>(path, options, retry);
+  if (method !== 'GET' || !retry) return request;
+
+  inflightGets.set(cacheKey, request);
+  try {
+    return await request;
+  } finally {
+    inflightGets.delete(cacheKey);
+  }
 }
 
 export const api = {

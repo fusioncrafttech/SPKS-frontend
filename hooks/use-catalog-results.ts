@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 
 import { CatalogItem } from '@/lib/catalog';
 import { handlePremiumError } from '@/lib/premium';
@@ -9,25 +9,31 @@ export function useCatalogResults() {
   const [title, setTitle] = useState('');
   const [items, setItems] = useState<CatalogItem[]>([]);
   const [emptyMessage, setEmptyMessage] = useState('No content has been published yet.');
+  const requestId = useRef(0);
 
   const close = useCallback(() => setVisible(false), []);
 
   const show = useCallback(async (label: string, loader: () => Promise<CatalogItem[]>) => {
+    const id = requestId.current + 1;
+    requestId.current = id;
     setTitle(label);
     setVisible(true);
     setLoading(true);
     setItems([]);
     setEmptyMessage('No content has been published yet.');
     try {
-      setItems(await loader());
+      const nextItems = await loader();
+      if (requestId.current !== id) return;
+      setItems(nextItems);
     } catch (error) {
+      if (requestId.current !== id) return;
       if (handlePremiumError(error, 'This content is locked. Buy a plan to continue.')) {
         setVisible(false);
         return;
       }
       setEmptyMessage(error instanceof Error ? error.message : 'Could not load content.');
     } finally {
-      setLoading(false);
+      if (requestId.current === id) setLoading(false);
     }
   }, []);
 

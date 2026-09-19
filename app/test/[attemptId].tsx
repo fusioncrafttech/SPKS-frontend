@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Image, StyleSheet, TouchableOpacity, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
@@ -19,6 +19,27 @@ export default function TakeTestScreen() {
   const [questions, setQuestions] = useState<TestQuestion[]>([]);
   const [index, setIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<string, string>>({});
+  const answersRef = useRef<Record<string, string>>({});
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    answersRef.current = answers;
+  }, [answers]);
+
+  useEffect(() => {
+    return () => {
+      if (saveTimer.current) {
+        clearTimeout(saveTimer.current);
+        saveTimer.current = null;
+        const id = String(attemptId || '');
+        const payload = Object.entries(answersRef.current).map(([questionId, selectedAnswer]) => ({
+          questionId,
+          selectedAnswer,
+        }));
+        if (id && payload.length) void saveAnswers(id, payload);
+      }
+    };
+  }, [attemptId]);
 
   useEffect(() => {
     if (!attemptId) return;
@@ -38,9 +59,9 @@ export default function TakeTestScreen() {
     [index, questions.length]
   );
 
-  const persistAnswers = async () => {
+  const persistAnswers = async (nextAnswers = answersRef.current) => {
     if (!attemptId) return;
-    const payload = Object.entries(answers).map(([questionId, selectedAnswer]) => ({ questionId, selectedAnswer }));
+    const payload = Object.entries(nextAnswers).map(([questionId, selectedAnswer]) => ({ questionId, selectedAnswer }));
     if (!payload.length) return;
     await saveAnswers(attemptId, payload);
   };
@@ -49,12 +70,20 @@ export default function TakeTestScreen() {
     if (!question || !attemptId) return;
     setAnswers((current) => {
       const next = { ...current, [question.id]: option };
-      void saveAnswers(attemptId, Object.entries(next).map(([questionId, selectedAnswer]) => ({ questionId, selectedAnswer })));
+      answersRef.current = next;
+      if (saveTimer.current) clearTimeout(saveTimer.current);
+      saveTimer.current = setTimeout(() => {
+        void persistAnswers(next);
+      }, 400);
       return next;
     });
   };
 
   const goNext = async () => {
+    if (saveTimer.current) {
+      clearTimeout(saveTimer.current);
+      saveTimer.current = null;
+    }
     try {
       await persistAnswers();
     } catch {
@@ -71,7 +100,11 @@ export default function TakeTestScreen() {
         onPress: async () => {
           setSubmitting(true);
           try {
-            const payload = Object.entries(answers).map(([questionId, selectedAnswer]) => ({ questionId, selectedAnswer }));
+            if (saveTimer.current) {
+              clearTimeout(saveTimer.current);
+              saveTimer.current = null;
+            }
+            const payload = Object.entries(answersRef.current).map(([questionId, selectedAnswer]) => ({ questionId, selectedAnswer }));
             await saveAnswers(String(attemptId), payload);
             await submitAttempt(String(attemptId), payload);
             router.replace(`/test-result/${attemptId}` as any);

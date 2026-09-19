@@ -11,7 +11,6 @@ import { ApiError } from '@/lib/api';
 import {
   createPaymentOrder,
   formatSubscriptionDate,
-  getCurrentSubscription,
   getPaymentConfig,
   listPlans,
   subscriptionEndsAt,
@@ -60,23 +59,22 @@ export default function PriceScreen() {
 
   const load = useCallback(async () => {
     try {
-      const [plans, currentUser, currentSub] = await Promise.all([
+      const [plans, currentUser] = await Promise.all([
         listPlans(),
         refreshUser(),
-        getCurrentSubscription(),
       ]);
       if (plans.length) {
         setPricingPlans(plans);
         const monthly = plans.find(isMonthly);
         setSelectedId((current) => current || monthly?.id || plans[0]?.id || '');
       }
-      setSubscription(currentUser?.subscription || currentSub);
+      setSubscription(currentUser?.subscription || authSubscription);
     } catch (error) {
       Alert.alert('Plans', error instanceof Error ? error.message : 'Could not load plans.');
     } finally {
       setLoading(false);
     }
-  }, [refreshUser]);
+  }, [refreshUser, authSubscription]);
 
   useFocusEffect(
     useCallback(() => {

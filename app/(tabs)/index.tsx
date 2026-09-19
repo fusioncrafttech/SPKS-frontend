@@ -18,7 +18,7 @@ import { useTheme } from '@/contexts/theme-context';
 import { api } from '@/lib/api';
 import { courseRoute, isCourseLocked, listCourses, type Course } from '@/lib/catalog';
 import { sendToPlans } from '@/lib/premium';
-import { getContinueLearning, getStreak, openContinueItem, type ContinueLearning } from '@/lib/study';
+import { getContinueLearning, openContinueItem, type ContinueLearning } from '@/lib/study';
 
 const STATUSBAR_HEIGHT = Platform.OS === 'ios' ? 44 : StatusBar.currentHeight || 24;
 
@@ -169,66 +169,49 @@ export default function HomeScreen() {
     useCallback(() => {
       let cancelled = false;
 
-      const loadCourses = (active: boolean) => {
-        listCourses()
-          .then((items) => {
-            if (cancelled) return;
-            if (!items.length) {
-              setCourses(
-                fallbackCourses.map((item) => ({
-                  ...item,
-                  locked: item.route === '/current-affairs' ? false : !active,
-                })),
-              );
-              return;
-            }
-            setCourses(
-              items.map((item: Course) => {
-                const title = item.name || item.title || 'Course';
-                return {
-                  id: item.id,
-                  title,
-                  subtitle: item.description || item.subtitle || '',
-                  route: courseRoute(item) || '/tnpsc',
-                  locked: isCourseLocked(item, active),
-                };
-              }),
-            );
-          })
-          .catch(() => {
-            if (cancelled) return;
-            setCourses(
-              fallbackCourses.map((item) => ({
-                ...item,
-                locked: item.route === '/current-affairs' ? false : !active,
-              })),
-            );
-          });
+      const applyCourses = (items: Course[], active: boolean) => {
+        if (!items.length) {
+          setCourses(
+            fallbackCourses.map((item) => ({
+              ...item,
+              locked: item.route === '/current-affairs' ? false : !active,
+            })),
+          );
+          return;
+        }
+        setCourses(
+          items.map((item: Course) => {
+            const title = item.name || item.title || 'Course';
+            return {
+              id: item.id,
+              title,
+              subtitle: item.description || item.subtitle || '',
+              route: courseRoute(item) || '/tnpsc',
+              locked: isCourseLocked(item, active),
+            };
+          }),
+        );
       };
 
-      loadCourses(hasActiveSubscription);
-      void refreshUser().then((latest) => {
+      Promise.all([
+        listCourses().catch(() => [] as Course[]),
+        api
+          .get<{ dailyStreak?: number; testsCompleted?: number; averageScore?: number }>('/api/users/me/stats')
+          .catch(() => null),
+        getContinueLearning(),
+        refreshUser(),
+      ]).then(([items, data, continueLearning, latest]) => {
         if (cancelled) return;
-        loadCourses(Boolean(latest?.hasActiveSubscription));
-      });
-
-      api
-        .get<{ dailyStreak?: number; testsCompleted?: number; averageScore?: number }>('/api/users/me/stats')
-        .then((data) => {
-          if (cancelled || !data) return;
+        const active = Boolean(latest?.hasActiveSubscription ?? hasActiveSubscription);
+        applyCourses(items, active);
+        if (data) {
           setStats({
             dailyStreak: data.dailyStreak || 0,
             testsCompleted: data.testsCompleted || 0,
             averageScore: Math.round(data.averageScore || 0),
           });
-        })
-        .catch(() => undefined);
-
-      getStreak().then((streak) => {
-        if (!cancelled && streak) setStats((current) => ({ ...current, dailyStreak: streak }));
-      });
-      getContinueLearning().then((item) => {
-        if (!cancelled) setContinueItem(item);
+        }
+        setContinueItem(continueLearning);
       });
 
       return () => {

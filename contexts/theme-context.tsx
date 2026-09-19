@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 type ThemeMode = 'light' | 'dark';
@@ -72,9 +72,9 @@ const THEME_STORAGE_KEY = 'appTheme';
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setThemeState] = useState<ThemeMode>('light');
-  const [isLoaded, setIsLoaded] = useState(false);
 
   const colors = theme === 'dark' ? darkColors : lightColors;
+  const isDark = theme === 'dark';
 
   useEffect(() => {
     loadTheme();
@@ -95,8 +95,6 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       }
     } catch (error) {
       console.log('Error loading theme:', error);
-    } finally {
-      setIsLoaded(true);
     }
   };
 
@@ -118,27 +116,18 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     setTheme(next);
   }, [theme, setTheme]);
 
-  const value: ThemeContextType = {
-    theme,
-    isDark: theme === 'dark',
-    setTheme,
-    toggleTheme,
-    colors,
-  };
-
-  if (!isLoaded) {
-    return (
-      <ThemeContext.Provider value={{ ...value, theme: 'light', isDark: false, colors: lightColors } as ThemeContextType}>
-        {children}
-      </ThemeContext.Provider>
-    );
-  }
-
-  return (
-    <ThemeContext.Provider value={value}>
-      {children}
-    </ThemeContext.Provider>
+  const value = useMemo<ThemeContextType>(
+    () => ({
+      theme,
+      isDark,
+      setTheme,
+      toggleTheme,
+      colors,
+    }),
+    [theme, isDark, setTheme, toggleTheme, colors],
   );
+
+  return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
 }
 
 export function useTheme() {

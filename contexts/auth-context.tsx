@@ -1,15 +1,17 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 
-import { getAccessToken } from '@/lib/api';
+import { getAccessToken, invalidateApiCache } from '@/lib/api';
 import {
   AuthUser,
   fetchCurrentUser,
+  loadPersistedUser,
   loginUser,
   logoutUser,
   persistUser,
   registerUser,
 } from '@/lib/auth';
 import { getCurrentSubscription, isActiveSubscription, type Subscription } from '@/lib/payments';
+import { clearCourseMemory } from '@/lib/catalog';
 
 type AuthContextType = {
   user: AuthUser | null;
@@ -27,7 +29,7 @@ type AuthContextType = {
     state?: string;
   }) => Promise<AuthUser>;
   logout: () => Promise<void>;
-  refreshUser: () => Promise<AuthUser | null>;
+  refreshUser: (options?: { force?: boolean }) => Promise<AuthUser | null>;
   applySubscription: (input: { hasActiveSubscription?: boolean; subscription?: Subscription | null }) => void;
   setUser: (user: AuthUser | null) => void;
 };
@@ -38,6 +40,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUserState] = useState<AuthUser | null>(null);
   const [isReady, setIsReady] = useState(false);
   const userRef = useRef<AuthUser | null>(null);
+  const lastRefreshAt = useRef(0);
 
   const setUser = useCallback((next: AuthUser | null) => {
     userRef.current = next;
@@ -64,6 +67,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       subscription,
       hasActiveSubscription: fromServer || (input.keepExistingActive !== false && !input.current && fromPrev),
     };
+    if (prev && isActiveSubscription(prev.hasActiveSubscription, prev.subscription ?? null) !== next.hasActiveSubscription) {
+      clearCourseMemory();
+      invalidateApiCache();
+    }
     userRef.current = next;
     setUserState(next);
     void persistUser(next);
@@ -75,14 +82,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     (async () => {
       try {
-        const token = await getAccessToken();
-        if (!token) return;
-        const me = await fetchCurrentUser();
-        const current = await getCurrentSubscription();
+        const [token, persisted] = await Promise.all([getAccessToken(), loadPersistedUser()]);
         if (cancelled) return;
-        mergeSession({ me, current, keepExistingActive: false });
+        if (persisted) {
+          userRef.current = persisted;
+          setUserState(persisted);
+        }
+        setIsReady(true);
+        if (!token) return;
+
+        lastRefreshAt.current = Date.now();
+        const [me, current] = await Promise.all([
+          fetchCurrentUser().catch(() => null),
+          getCurrentSubscription(),
+        ]);
+        if (cancelled) return;
+        if (!me && !userRef.current) {
+          userRef.current = null;
+          setUserState(null);
+          return;
+        }
+        if (!me) {
+          const stillHasToken = await getAccessToken();
+          if (!stillHasToken) {
+            userRef.current = null;
+            setUserState(null);
+            return;
+          }
+        }
+        mergeSession({ me: me || undefined, current, keepExistingActive: false });
       } catch {
-        if (!cancelled) {
+        if (!cancelled && !userRef.current) {
           userRef.current = null;
           setUserState(null);
         }
@@ -97,8 +127,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [mergeSession]);
 
   const login = useCallback(async (input: { email: string; password: string }) => {
+    invalidateApiCache();
+    clearCourseMemory();
     const current = await loginUser(input);
     userRef.current = current;
+    lastRefreshAt.current = Date.now();
     setUserState(current);
     return current;
   }, []);
@@ -111,15 +144,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     password: string;
     state?: string;
   }) => {
+    invalidateApiCache();
+    clearCourseMemory();
     const current = await registerUser(input);
     userRef.current = current;
+    lastRefreshAt.current = Date.now();
     setUserState(current);
     return current;
   }, []);
 
   const logout = useCallback(async () => {
     await logoutUser();
+    invalidateApiCache();
+    clearCourseMemory();
     userRef.current = null;
+    lastRefreshAt.current = 0;
     setUserState(null);
   }, []);
 
@@ -137,18 +176,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
     userRef.current = next;
     setUserState(next);
+    clearCourseMemory();
+    invalidateApiCache();
+    lastRefreshAt.current = 0;
     void persistUser(next);
   }, []);
 
-  const refreshUser = useCallback(async () => {
-    let me: AuthUser | null = null;
-    try {
-      me = await fetchCurrentUser();
-    } catch {
-      me = null;
+  const refreshUser = useCallback(async (options?: { force?: boolean }) => {
+    if (!options?.force && userRef.current && Date.now() - lastRefreshAt.current < 30_000) {
+      return userRef.current;
     }
-    const current = await getCurrentSubscription();
-    return mergeSession({ me, current, keepExistingActive: true });
+    lastRefreshAt.current = Date.now();
+    const [me, current] = await Promise.all([
+      fetchCurrentUser().catch(() => null),
+      getCurrentSubscription(),
+    ]);
+    return mergeSession({ me: me || undefined, current, keepExistingActive: true });
   }, [mergeSession]);
 
   const subscription = user?.subscription ?? null;

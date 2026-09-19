@@ -3,7 +3,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { api, clearTokens, getRefreshToken, setTokens } from './api';
 import { isActiveSubscription, mapSubscription, type Subscription } from './payments';
 
-export const USER_PROFILE_KEY = 'userProfile';
+const USER_PROFILE_KEY = 'userProfile';
+let lastPersistedUserJson = '';
 
 export type AuthUser = {
   id: string;
@@ -42,10 +43,26 @@ export function mapProfile(user: AuthUser | null | undefined) {
 
 export async function persistUser(user: AuthUser | null) {
   if (!user) {
+    lastPersistedUserJson = '';
     await AsyncStorage.removeItem(USER_PROFILE_KEY);
     return;
   }
-  await AsyncStorage.setItem(USER_PROFILE_KEY, JSON.stringify(mapProfile(user)));
+  const next = JSON.stringify(user);
+  if (next === lastPersistedUserJson) return;
+  lastPersistedUserJson = next;
+  await AsyncStorage.setItem(USER_PROFILE_KEY, next);
+}
+
+export async function loadPersistedUser(): Promise<AuthUser | null> {
+  try {
+    const raw = await AsyncStorage.getItem(USER_PROFILE_KEY);
+    if (!raw) return null;
+    lastPersistedUserJson = raw;
+    const parsed = JSON.parse(raw) as AuthUser;
+    return normalizeAuthUser(parsed) || (parsed.email || parsed.firstName ? parsed : null);
+  } catch {
+    return null;
+  }
 }
 
 function asRecord(value: unknown): Record<string, any> | null {
