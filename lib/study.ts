@@ -1,9 +1,8 @@
-import { Alert, Linking } from 'react-native';
 import { router } from 'expo-router';
 
-import { api, asList } from './api';
+import { api, asList, toAbsoluteApiUrl } from './api';
 import { CatalogItem, asCatalogItem, getCourse, itemTitle } from './catalog';
-import { isPremiumRequired, promptPremium, startTestFlow } from './tests';
+import { promptPremium, startTestFlow } from './tests';
 
 export type NamedItem = {
   id: string;
@@ -11,6 +10,8 @@ export type NamedItem = {
   subtitle?: string;
   isLocked?: boolean;
   isPremium?: boolean;
+  pdfViewUrl?: string | null;
+  viewUrl?: string | null;
 };
 
 export type GroupDetail = {
@@ -34,6 +35,8 @@ function mapNamed(item: Record<string, any>): NamedItem | null {
     subtitle: item.subtitle || item.description || item.summary || '',
     isLocked: Boolean(item.isLocked),
     isPremium: Boolean(item.isPremium),
+    pdfViewUrl: item.pdfViewUrl || null,
+    viewUrl: item.viewUrl || null,
   };
 }
 
@@ -91,7 +94,9 @@ export async function listChapterLessons(chapterId: string) {
 }
 
 export async function getLesson(lessonId: string) {
-  return api.get<Record<string, any>>(`/api/lessons/${lessonId}`);
+  const data = await api.get<Record<string, any>>(`/api/lessons/${lessonId}`);
+  const lesson = data?.id ? data : data?.lesson || data?.data;
+  return lesson || data;
 }
 
 export async function listGroupResource(groupId: string, kind: 'books' | 'notes' | 'outside-sources' | 'videos' | 'tests') {
@@ -113,9 +118,27 @@ export async function getContent(contentId: string) {
   }
 }
 
-export async function getContentDownloadUrl(contentId: string) {
-  const data = await api.get<Record<string, any>>(`/api/content/${contentId}/download`);
-  return String(data?.url || data?.fileUrl || data?.downloadUrl || '');
+export function lessonPdfViewUrl(lessonId: string, lesson?: Record<string, any> | null) {
+  const path = String(lesson?.pdfViewUrl || lesson?.pdf_view_url || `/api/lessons/${lessonId}/pdf`);
+  return path.startsWith('http') ? path : toAbsoluteApiUrl(path);
+}
+
+export function contentViewUrl(contentId: string, content?: Record<string, any> | null) {
+  const path = String(content?.viewUrl || content?.pdfViewUrl || `/api/content/${contentId}/view`);
+  return path.startsWith('http') ? path : toAbsoluteApiUrl(path);
+}
+
+export function hasLessonPdf(lesson?: Record<string, any> | null) {
+  return Boolean(lesson?.pdfViewUrl || lesson?.pdf_view_url || lesson?.pdfUrl || lesson?.pdf_url);
+}
+
+export function hasContentPdf(content?: Record<string, any> | null) {
+  if (!content) return false;
+  if (content.viewUrl || content.pdfViewUrl || content.fileUrl || content.pdfUrl) return true;
+  const type = String(content.contentType || content.type || content.fileType || '').toLowerCase();
+  if (type.includes('pdf') || type === 'file' || type === 'document') return true;
+  const file = String(content.sourceUrl || content.url || '');
+  return /\.pdf($|\?)/i.test(file);
 }
 
 export async function getVideo(videoId: string) {
@@ -247,57 +270,23 @@ export async function openStudyItem(item: CatalogItem, kind: 'content' | 'video'
 
 export async function openContinueItem(item: ContinueLearning | null | undefined) {
   if (!item) return false;
+  if (item.lessonId) {
+    void markLessonProgress(item.lessonId);
+    router.push(`/lesson/${item.lessonId}` as any);
+    return true;
+  }
   if (item.testId) {
     await startTestFlow(item.testId);
     return true;
   }
   if (item.videoId) {
-    if (item.lessonId) void markLessonProgress(item.lessonId);
     router.push(`/video/${item.videoId}` as any);
     return true;
   }
   if (item.contentId) {
-    if (item.lessonId) void markLessonProgress(item.lessonId);
     router.push(`/content/${item.contentId}` as any);
-    return true;
-  }
-  if (item.lessonId) {
-    void markLessonProgress(item.lessonId);
-    router.push(`/content/${item.lessonId}` as any);
     return true;
   }
   return false;
 }
 
-export async function downloadContent(contentId: string, fallbackUrl?: string | null) {
-  try {
-    const url = (await getContentDownloadUrl(contentId)) || fallbackUrl;
-    if (!url) {
-      Alert.alert('Download', 'No file is available yet. Ask admin to upload this PDF.');
-      return;
-    }
-    await Linking.openURL(url);
-  } catch (error) {
-    if (isPremiumRequired(error)) {
-      promptPremium('This file is locked. Upgrade your plan to download it.');
-      return;
-    }
-    if (fallbackUrl) {
-      await Linking.openURL(fallbackUrl);
-      return;
-    }
-    Alert.alert('Download', error instanceof Error ? error.message : 'Could not download this file.');
-  }
-}
-
-export async function resolveContentFileUrl(contentId: string, fallbackUrl?: string | null) {
-  try {
-    return (await getContentDownloadUrl(contentId)) || fallbackUrl || '';
-  } catch (error) {
-    if (isPremiumRequired(error)) {
-      promptPremium('This file is locked. Upgrade your plan to open it.');
-      throw error;
-    }
-    return fallbackUrl || '';
-  }
-}

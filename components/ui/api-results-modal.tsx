@@ -5,6 +5,7 @@ import { ThemedText } from '@/components/themed-text';
 import { MenuRow } from '@/components/ui/menu-row';
 import { useTheme } from '@/contexts/theme-context';
 import { CatalogItem, itemSubtitle, itemTitle, openCatalogItem } from '@/lib/catalog';
+import { promptPremium } from '@/lib/tests';
 
 type Props = {
   visible: boolean;
@@ -57,6 +58,11 @@ export function ApiResultsModal({
                   index={index}
                   locked={item.isLocked}
                   onPress={() => {
+                    if (item.isLocked) {
+                      onClose();
+                      promptPremium('This file is locked. Upgrade your plan to view it.');
+                      return;
+                    }
                     onClose();
                     void openCatalogItem(item);
                   }}

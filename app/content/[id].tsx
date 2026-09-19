@@ -6,10 +6,11 @@ import { WebView } from 'react-native-webview';
 
 import { ThemedText } from '@/components/themed-text';
 import { PageHeader } from '@/components/ui/page-header';
+import { PdfViewer } from '@/components/ui/pdf-viewer';
 import { PrimaryButton } from '@/components/ui/primary-button';
 import { Screen } from '@/components/ui/screen';
 import { useTheme } from '@/contexts/theme-context';
-import { completeLesson, downloadContent, getContent, isLockedItem, markLessonProgress, resolveContentFileUrl, toggleBookmark } from '@/lib/study';
+import { completeLesson, contentViewUrl, getContent, hasContentPdf, isLockedItem, markLessonProgress, toggleBookmark } from '@/lib/study';
 import { isPremiumRequired, promptPremium } from '@/lib/tests';
 
 export default function ContentScreen() {
@@ -18,7 +19,7 @@ export default function ContentScreen() {
   const [loading, setLoading] = useState(true);
   const [bookmarked, setBookmarked] = useState(false);
   const [content, setContent] = useState<Record<string, any> | null>(null);
-  const [fileUrl, setFileUrl] = useState('');
+  const [viewUrl, setViewUrl] = useState('');
 
   useEffect(() => {
     if (!id) return;
@@ -32,8 +33,9 @@ export default function ContentScreen() {
           promptPremium('This PDF is locked. Upgrade your plan to open it.');
           return;
         }
-        const url = await resolveContentFileUrl(id, data?.fileUrl || data?.sourceUrl || data?.url);
-        setFileUrl(url);
+        if (hasContentPdf(data) || data?.viewUrl) {
+          setViewUrl(contentViewUrl(id, data));
+        }
       } catch (error) {
         if (isPremiumRequired(error)) return;
         Alert.alert('Content', error instanceof Error ? error.message : 'Could not load this item.');
@@ -81,26 +83,23 @@ export default function ContentScreen() {
           <ThemedText style={{ color: colors.textSecondary, textAlign: 'center', marginBottom: 16 }}>Upgrade to open this file.</ThemedText>
           <PrimaryButton title="View plans" onPress={() => router.push('/(tabs)/price')} />
         </View>
-      ) : fileUrl ? (
-        <WebView source={{ uri: fileUrl }} style={{ flex: 1 }} />
+      ) : viewUrl ? (
+        <PdfViewer uri={viewUrl} />
       ) : html ? (
         <WebView originWhitelist={['*']} source={{ html: String(html) }} style={{ flex: 1 }} />
       ) : (
         <View style={styles.center}>
           <ThemedText style={{ color: colors.text, fontWeight: '800', marginBottom: 8 }}>{content?.title || 'Content'}</ThemedText>
           <ThemedText style={{ color: colors.textSecondary, textAlign: 'center', marginBottom: 16 }}>
-            {content?.description || content?.summary || 'No fileUrl yet. Upload the PDF in admin first.'}
+            {content?.description || content?.summary || 'No PDF is available to view yet.'}
           </ThemedText>
         </View>
       )}
-      {!locked && id ? (
+      {!locked && content?.lessonId ? (
         <View style={[styles.footer, { backgroundColor: colors.card, borderTopColor: colors.border }]}>
-          <PrimaryButton title="Download" onPress={() => downloadContent(String(id), fileUrl)} />
-          {content?.lessonId ? (
-            <TouchableOpacity onPress={handleComplete} style={styles.complete}>
-              <ThemedText style={{ color: colors.tint, fontWeight: '700' }}>Mark complete</ThemedText>
-            </TouchableOpacity>
-          ) : null}
+          <TouchableOpacity onPress={handleComplete} style={styles.complete}>
+            <ThemedText style={{ color: colors.tint, fontWeight: '700' }}>Mark complete</ThemedText>
+          </TouchableOpacity>
         </View>
       ) : null}
     </Screen>

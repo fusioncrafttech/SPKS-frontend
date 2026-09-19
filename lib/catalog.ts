@@ -18,6 +18,8 @@ export type CatalogItem = {
   description?: string;
   summary?: string;
   fileUrl?: string | null;
+  viewUrl?: string | null;
+  pdfViewUrl?: string | null;
   videoUrl?: string | null;
   sourceUrl?: string | null;
   youtubeId?: string | null;
@@ -99,6 +101,8 @@ export function asCatalogItem(item: Record<string, any>, index = 0): CatalogItem
     description: item.description,
     summary: item.summary,
     fileUrl: item.fileUrl,
+    viewUrl: item.viewUrl,
+    pdfViewUrl: item.pdfViewUrl,
     videoUrl: item.videoUrl,
     sourceUrl: item.sourceUrl,
     youtubeId: item.youtubeId,

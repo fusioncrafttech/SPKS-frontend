@@ -5,10 +5,11 @@ import { WebView } from 'react-native-webview';
 
 import { ThemedText } from '@/components/themed-text';
 import { PageHeader } from '@/components/ui/page-header';
+import { PdfViewer } from '@/components/ui/pdf-viewer';
 import { PrimaryButton } from '@/components/ui/primary-button';
 import { Screen, ScreenScroll } from '@/components/ui/screen';
 import { useTheme } from '@/contexts/theme-context';
-import { completeLesson, getLesson, isLockedItem, markLessonProgress } from '@/lib/study';
+import { completeLesson, getLesson, hasLessonPdf, isLockedItem, lessonPdfViewUrl, markLessonProgress } from '@/lib/study';
 import { promptPremium } from '@/lib/tests';
 
 export default function LessonScreen() {
@@ -32,9 +33,10 @@ export default function LessonScreen() {
       .finally(() => setLoading(false));
   }, [id]);
 
-  const html = lesson?.html || lesson?.body || lesson?.content;
+  const html = lesson?.html || lesson?.body;
   const videoUrl = lesson?.videoUrl || lesson?.youtubeId;
-  const contentId = lesson?.contentId;
+  const pdfUri = id ? lessonPdfViewUrl(id, lesson) : '';
+  const showPdf = Boolean(id) && hasLessonPdf(lesson);
 
   const handleComplete = async () => {
     if (!id) return;
@@ -72,18 +74,17 @@ export default function LessonScreen() {
   return (
     <Screen>
       <PageHeader title={lesson?.title || 'Lesson'} />
-      {html ? (
+      {showPdf && pdfUri ? (
+        <PdfViewer uri={pdfUri} />
+      ) : html ? (
         <WebView originWhitelist={['*']} source={{ html: String(html) }} style={{ flex: 1 }} />
       ) : (
         <ScreenScroll>
           <ThemedText style={[styles.title, { color: colors.text }]}>{lesson?.title || 'Lesson'}</ThemedText>
           <ThemedText style={{ color: colors.textSecondary, lineHeight: 22, marginBottom: 16 }}>
-            {lesson?.description || lesson?.summary || 'Continue this lesson to keep your Home progress in sync.'}
+            {lesson?.description || lesson?.summary || 'Admin has not uploaded a PDF for this lesson yet.'}
           </ThemedText>
-          {contentId ? (
-            <PrimaryButton title="Open attached PDF" onPress={() => router.push(`/content/${contentId}` as any)} />
-          ) : null}
-          {videoUrl && !contentId ? (
+          {videoUrl ? (
             <PrimaryButton title="Open video" onPress={() => router.push(`/video/${id}` as any)} />
           ) : null}
         </ScreenScroll>

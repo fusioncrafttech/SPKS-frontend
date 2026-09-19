@@ -123,6 +123,34 @@ function getPayload<T>(payload: ApiResponse<T> | T | undefined): T {
   return payload as T;
 }
 
+export function toAbsoluteApiUrl(pathOrUrl?: string | null) {
+  if (!pathOrUrl) return '';
+  const value = String(pathOrUrl).trim();
+  if (!value) return '';
+  if (/^https?:\/\//i.test(value)) return value;
+  return `${API_URL}${value.startsWith('/') ? value : `/${value}`}`;
+}
+
+export async function apiFetch(pathOrUrl: string, options: RequestInit = {}, retry = true): Promise<Response> {
+  const url = toAbsoluteApiUrl(pathOrUrl) || pathOrUrl;
+  const accessToken = await getAccessToken();
+  const headers = new Headers(options.headers);
+  if (accessToken) headers.set('Authorization', `Bearer ${accessToken}`);
+
+  let response: Response;
+  try {
+    response = await fetch(url, { ...options, headers });
+  } catch {
+    throw new ApiError('Cannot reach the server. Check that the backend is running and EXPO_PUBLIC_API_URL is set.', 0);
+  }
+
+  if (response.status === 401 && retry && (await refreshAccessToken())) {
+    return apiFetch(pathOrUrl, options, false);
+  }
+
+  return response;
+}
+
 export async function apiRequest<T>(path: string, options: RequestInit = {}, retry = true): Promise<T> {
   const accessToken = await getAccessToken();
   const headers = new Headers(options.headers);

@@ -17,7 +17,7 @@ import { getHelpContact } from '@/lib/study';
 
 const faqs = [
   { id: '1', question: 'How do I reset my password?', answer: 'Go to Profile > Settings > Change Password, or use Forgot password on login.' },
-  { id: '2', question: 'How can I download courses for offline use?', answer: 'Open a lesson and tap Download if a file is available.' },
+  { id: '2', question: 'How do I open lesson PDFs?', answer: 'Open a lesson or study material and the PDF opens in the app. Files are viewed in place, not saved to Downloads.' },
   { id: '3', question: 'How do I track my progress?', answer: 'Go to Profile > Progress to see course completion and test history.' },
   { id: '4', question: 'Can I change my subscription plan?', answer: 'Yes, go to the Plans tab to view and change your subscription plan.' },
 ];
