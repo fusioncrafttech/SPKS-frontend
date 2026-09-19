@@ -3,6 +3,8 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 
 export type IonName = ComponentProps<typeof Ionicons>['name'];
 
+export const APP_NAME = 'SPKS Exam Academy';
+
 export const Brand = {
   indigo: ['#1E1B4B', '#4338CA'] as [string, string],
   indigoSoft: ['#4338CA', '#7C3AED'] as [string, string],
@@ -40,3 +42,5 @@ export function courseBrand(title?: string) {
   }
   return { icon: 'library' as IonName, gradient: Brand.indigoSoft, tag: 'Govt exams' };
 }
+
+export const SPKS_LOGO = require('../assets/images/spks-logo.jpg');

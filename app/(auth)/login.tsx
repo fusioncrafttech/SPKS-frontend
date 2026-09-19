@@ -80,8 +80,8 @@ export default function LoginScreen() {
         <KeyboardAvoidingView behavior="padding" style={styles.keyboardView} keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}>
           <ScreenScroll keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" bounces={false} contentStyle={styles.scroll}>
             <HeroBanner
-              icon="school"
-              eyebrow="SPKS"
+              showLogo
+              eyebrow="SPKS Exam Academy"
               title="Welcome back"
               subtitle="Sign in to continue your exam preparation"
               gradient={Brand.indigo}

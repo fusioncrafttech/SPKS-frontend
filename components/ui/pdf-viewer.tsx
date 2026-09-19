@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Platform, StyleSheet, View } from 'react-native';
+import { Platform, StyleSheet, View } from 'react-native';
 import { WebView } from 'react-native-webview';
 
 import { ThemedText } from '@/components/themed-text';
+import { LoadingState } from '@/components/ui/brand-logo';
 import { useTheme } from '@/contexts/theme-context';
 import { API_URL, apiFetch, ApiError, getAccessToken, toAbsoluteApiUrl } from '@/lib/api';
 import { isPremiumRequired, promptPremium } from '@/lib/tests';
@@ -155,11 +156,7 @@ export function PdfViewer({ uri }: Props) {
   }, [sourceUri, useStreamViewer]);
 
   if (loading || token === undefined) {
-    return (
-      <View style={styles.center}>
-        <ActivityIndicator color={colors.tint} />
-      </View>
-    );
+    return <LoadingState fill />;
   }
 
   if (error) {

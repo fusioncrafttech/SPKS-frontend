@@ -1,11 +1,12 @@
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider as NavThemeProvider } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useMemo } from 'react';
-import { ActivityIndicator, View } from 'react-native';
+import { View } from 'react-native';
 import 'react-native-reanimated';
 
 import { AuthProvider, useAuth } from '@/contexts/auth-context';
 import { ThemeProvider, useTheme } from '@/contexts/theme-context';
+import { LoadingState } from '@/components/ui/brand-logo';
 
 export const unstable_settings = {
   initialRouteName: '(auth)',
@@ -32,8 +33,8 @@ function RootLayoutNav() {
 
   if (!isReady) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background }}>
-        <ActivityIndicator color={colors.tint} />
+      <View style={{ flex: 1, backgroundColor: colors.background }}>
+        <LoadingState fill />
       </View>
     );
   }

@@ -1,19 +1,18 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, View } from 'react-native';
+import { View } from 'react-native';
 
 import { EmptyNote } from '@/components/ui/empty-note';
 import { HeroBanner } from '@/components/ui/hero-banner';
+import { LoadingState } from '@/components/ui/brand-logo';
 import { MenuRow, MenuStack } from '@/components/ui/menu-row';
 import { PageHeader } from '@/components/ui/page-header';
 import { Screen, ScreenScroll } from '@/components/ui/screen';
 import { Brand } from '@/constants/brand';
-import { useTheme } from '@/contexts/theme-context';
 import { listChapterLessons, type NamedItem } from '@/lib/study';
 import { handlePremiumError, promptPremium } from '@/lib/tests';
 
 export default function ChapterScreen() {
-  const { colors } = useTheme();
   const { id } = useLocalSearchParams<{ id: string }>();
   const [loading, setLoading] = useState(true);
   const [lessons, setLessons] = useState<NamedItem[]>([]);
@@ -40,9 +39,7 @@ export default function ChapterScreen() {
           gradient={Brand.indigoSoft}
         />
         {loading ? (
-          <View style={{ paddingVertical: 24 }}>
-            <ActivityIndicator color={colors.tint} />
-          </View>
+          <LoadingState />
         ) : lessons.length ? (
           <MenuStack>
             {lessons.map((item, index) => (

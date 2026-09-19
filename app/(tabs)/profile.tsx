@@ -7,6 +7,7 @@ import { Alert, Image, ScrollView, StyleSheet, TouchableOpacity, View } from 're
 import { ThemedText } from '@/components/themed-text';
 import { Screen } from '@/components/ui/screen';
 import type { IonName } from '@/constants/brand';
+import { APP_NAME } from '@/constants/brand';
 import { useAuth } from '@/contexts/auth-context';
 import { useTheme } from '@/contexts/theme-context';
 import { api } from '@/lib/api';
@@ -200,7 +201,7 @@ export default function ProfileScreen() {
           <TouchableOpacity onPress={handleLogout} style={styles.logout} activeOpacity={0.8}>
             <ThemedText style={[styles.logoutText, { color: colors.danger }]}>Sign out of this account</ThemedText>
           </TouchableOpacity>
-          <ThemedText style={[styles.version, { color: colors.textMuted }]}>SPKS 1.0.0</ThemedText>
+          <ThemedText style={[styles.version, { color: colors.textMuted }]}>{APP_NAME} 1.1.0</ThemedText>
         </View>
       </ScrollView>
     </Screen>

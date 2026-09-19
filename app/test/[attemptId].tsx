@@ -1,10 +1,11 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Image, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Alert, Image, StyleSheet, TouchableOpacity, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { PageHeader } from '@/components/ui/page-header';
+import { LoadingState } from '@/components/ui/brand-logo';
 import { PrimaryButton } from '@/components/ui/primary-button';
 import { Screen, ScreenScroll } from '@/components/ui/screen';
 import { useTheme } from '@/contexts/theme-context';
@@ -122,9 +123,7 @@ export default function TakeTestScreen() {
     return (
       <Screen>
         <PageHeader title="Test" />
-        <View style={styles.center}>
-          <ActivityIndicator color={colors.tint} />
-        </View>
+        <LoadingState fill />
       </Screen>
     );
   }

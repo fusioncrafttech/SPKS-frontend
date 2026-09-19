@@ -1,19 +1,18 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, View } from 'react-native';
+import { View } from 'react-native';
 
 import { EmptyNote } from '@/components/ui/empty-note';
 import { HeroBanner } from '@/components/ui/hero-banner';
+import { LoadingState } from '@/components/ui/brand-logo';
 import { MenuRow, MenuStack } from '@/components/ui/menu-row';
 import { PageHeader } from '@/components/ui/page-header';
 import { Screen, ScreenScroll } from '@/components/ui/screen';
 import { Brand } from '@/constants/brand';
-import { useTheme } from '@/contexts/theme-context';
 import { listGroupSubjects, type NamedItem } from '@/lib/study';
 import { handlePremiumError } from '@/lib/premium';
 
 export default function GroupSubjectsScreen() {
-  const { colors } = useTheme();
   const { groupId } = useLocalSearchParams<{ groupId: string }>();
   const [loading, setLoading] = useState(true);
   const [subjects, setSubjects] = useState<NamedItem[]>([]);
@@ -41,9 +40,7 @@ export default function GroupSubjectsScreen() {
           gradient={Brand.teal}
         />
         {loading ? (
-          <View style={{ paddingVertical: 24 }}>
-            <ActivityIndicator color={colors.tint} />
-          </View>
+          <LoadingState />
         ) : subjects.length ? (
           <MenuStack>
             {subjects.map((item, index) => (

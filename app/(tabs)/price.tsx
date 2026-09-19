@@ -1,10 +1,12 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
+import { LoadingState } from '@/components/ui/brand-logo';
 import { Screen, ScreenScroll } from '@/components/ui/screen';
+import { APP_NAME } from '@/constants/brand';
 import { useAuth } from '@/contexts/auth-context';
 import { useTheme } from '@/contexts/theme-context';
 import { ApiError } from '@/lib/api';
@@ -116,7 +118,7 @@ export default function PriceScreen() {
           orderId: order.orderId,
           amount: String(order.amount),
           currency: order.currency || config?.currency || 'INR',
-          name: order.name || 'SPKS Exams',
+          name: order.name || APP_NAME,
           description: order.description || plan.name,
         },
       } as any);
@@ -161,9 +163,7 @@ export default function PriceScreen() {
         )}
 
         {loading ? (
-          <View style={styles.loader}>
-            <ActivityIndicator color={colors.tint} />
-          </View>
+          <LoadingState />
         ) : pricingPlans.length ? (
           pricingPlans.map((plan) => {
             const selectedPlan = plan.id === selectedId;

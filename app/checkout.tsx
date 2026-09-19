@@ -1,10 +1,12 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useMemo, useRef } from 'react';
-import { ActivityIndicator, Alert, StyleSheet, View } from 'react-native';
+import { Alert, StyleSheet, View } from 'react-native';
 import { WebView } from 'react-native-webview';
 
+import { LoadingState } from '@/components/ui/brand-logo';
 import { PageHeader } from '@/components/ui/page-header';
 import { Screen } from '@/components/ui/screen';
+import { APP_NAME } from '@/constants/brand';
 import { useAuth } from '@/contexts/auth-context';
 import { useTheme } from '@/contexts/theme-context';
 import { formatSubscriptionDate, subscriptionEndsAt, verifyPayment } from '@/lib/payments';
@@ -33,7 +35,7 @@ function checkoutHtml(params: {
         key: ${JSON.stringify(params.keyId)},
         amount: ${Number(params.amount) || 0},
         currency: ${JSON.stringify(params.currency)},
-        name: ${JSON.stringify(params.name || 'SPKS Exams')},
+        name: ${JSON.stringify(params.name || APP_NAME)},
         description: ${JSON.stringify(params.description)},
         order_id: ${JSON.stringify(params.orderId)},
         prefill: {
@@ -90,8 +92,8 @@ export default function CheckoutScreen() {
         orderId: String(params.orderId || ''),
         amount: String(params.amount || '0'),
         currency: String(params.currency || 'INR'),
-        name: String(params.name || 'SPKS Exams'),
-        description: String(params.description || params.name || 'SPKS plan'),
+        name: String(params.name || APP_NAME),
+        description: String(params.description || params.name || `${APP_NAME} plan`),
         prefillName: `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || user?.name || '',
         prefillEmail: user?.email || '',
         prefillContact: user?.phone || '',
@@ -158,13 +160,13 @@ export default function CheckoutScreen() {
             startInLoadingState
             renderLoading={() => (
               <View style={styles.loader}>
-                <ActivityIndicator color={colors.tint} />
+                <LoadingState />
               </View>
             )}
           />
         ) : (
           <View style={styles.loader}>
-            <ActivityIndicator color={colors.tint} />
+            <LoadingState fill />
           </View>
         )}
       </View>

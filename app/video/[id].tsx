@@ -1,10 +1,11 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Alert, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { WebView } from 'react-native-webview';
 
 import { ThemedText } from '@/components/themed-text';
+import { LoadingState } from '@/components/ui/brand-logo';
 import { PageHeader } from '@/components/ui/page-header';
 import { PrimaryButton } from '@/components/ui/primary-button';
 import { Screen } from '@/components/ui/screen';
@@ -69,9 +70,7 @@ export default function VideoScreen() {
         }
       />
       {loading ? (
-        <View style={styles.center}>
-          <ActivityIndicator color={colors.tint} />
-        </View>
+        <LoadingState fill />
       ) : locked ? (
         <View style={styles.center}>
           <ThemedText style={{ color: colors.text, fontWeight: '800', marginBottom: 8 }}>Premium video</ThemedText>

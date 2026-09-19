@@ -1,7 +1,8 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { ActivityIndicator, FlatList, Modal, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { FlatList, Modal, StyleSheet, TouchableOpacity, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
+import { LoadingState } from '@/components/ui/brand-logo';
 import { MenuRow } from '@/components/ui/menu-row';
 import { useTheme } from '@/contexts/theme-context';
 import { CatalogItem, itemSubtitle, itemTitle, openCatalogItem } from '@/lib/catalog';
@@ -38,10 +39,7 @@ export function ApiResultsModal({
             </TouchableOpacity>
           </View>
           {loading ? (
-            <View style={styles.centered}>
-              <ActivityIndicator color={colors.tint} />
-              <ThemedText style={[styles.hint, { color: colors.textSecondary }]}>Loading...</ThemedText>
-            </View>
+            <LoadingState message="Loading..." />
           ) : (
             <FlatList
               data={items}

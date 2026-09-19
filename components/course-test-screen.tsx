@@ -1,17 +1,17 @@
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, View } from 'react-native';
+import { View } from 'react-native';
 
 import { ApiResultsModal } from '@/components/ui/api-results-modal';
 import { EmptyNote } from '@/components/ui/empty-note';
 import { HeroBanner } from '@/components/ui/hero-banner';
+import { LoadingState } from '@/components/ui/brand-logo';
 import { MenuRow, MenuStack } from '@/components/ui/menu-row';
 import { PageHeader } from '@/components/ui/page-header';
 import { PrimaryButton } from '@/components/ui/primary-button';
 import { Screen, ScreenScroll } from '@/components/ui/screen';
 import type { IonName } from '@/constants/brand';
 import { useAuth } from '@/contexts/auth-context';
-import { useTheme } from '@/contexts/theme-context';
 import { useCatalogResults } from '@/hooks/use-catalog-results';
 import { getCourse } from '@/lib/catalog';
 import { handlePremiumError } from '@/lib/premium';
@@ -27,7 +27,6 @@ type Props = {
 };
 
 export function CourseTestScreen({ slug, title = 'Test', subtitle, icon, gradient }: Props) {
-  const { colors } = useTheme();
   const { hasActiveSubscription } = useAuth();
   const results = useCatalogResults();
   const [loading, setLoading] = useState(true);
@@ -78,9 +77,7 @@ export function CourseTestScreen({ slug, title = 'Test', subtitle, icon, gradien
           gradient={gradient}
         />
         {loading ? (
-          <View style={{ paddingVertical: 24 }}>
-            <ActivityIndicator color={colors.tint} />
-          </View>
+          <LoadingState />
         ) : premiumBlocked ? (
           <View style={{ gap: 16 }}>
             <EmptyNote

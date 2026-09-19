@@ -47,8 +47,8 @@ export default function ResetPasswordScreen() {
         <KeyboardAvoidingView behavior="padding" style={{ flex: 1 }} keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}>
           <ScreenScroll keyboardShouldPersistTaps="handled" contentStyle={styles.scroll}>
             <HeroBanner
-              icon="lock-closed"
-              eyebrow="Security"
+              showLogo
+              eyebrow="SPKS Exam Academy"
               title="Set a new password"
               subtitle="Choose a password you have not used before"
               gradient={Brand.indigo}

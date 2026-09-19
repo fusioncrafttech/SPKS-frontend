@@ -1,9 +1,10 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, StyleSheet, View } from 'react-native';
+import { Alert, StyleSheet, View } from 'react-native';
 import { WebView } from 'react-native-webview';
 
 import { ThemedText } from '@/components/themed-text';
+import { LoadingState } from '@/components/ui/brand-logo';
 import { PageHeader } from '@/components/ui/page-header';
 import { PdfViewer } from '@/components/ui/pdf-viewer';
 import { PrimaryButton } from '@/components/ui/primary-button';
@@ -58,9 +59,7 @@ export default function LessonScreen() {
     return (
       <Screen>
         <PageHeader title="Lesson" />
-        <View style={styles.center}>
-          <ActivityIndicator color={colors.tint} />
-        </View>
+        <LoadingState fill />
       </Screen>
     );
   }

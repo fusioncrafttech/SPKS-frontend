@@ -1,9 +1,10 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, View } from 'react-native';
+import { View } from 'react-native';
 
 import { ApiResultsModal } from '@/components/ui/api-results-modal';
 import { HeroBanner } from '@/components/ui/hero-banner';
+import { LoadingState } from '@/components/ui/brand-logo';
 import { MenuRow, MenuStack } from '@/components/ui/menu-row';
 import { PageHeader } from '@/components/ui/page-header';
 import { Screen, ScreenScroll } from '@/components/ui/screen';
@@ -71,9 +72,7 @@ export function GroupHubScreen({ courseSlug, gradient }: Props) {
           gradient={gradient}
         />
         {loading ? (
-          <View style={{ paddingVertical: 24 }}>
-            <ActivityIndicator color="#4338CA" />
-          </View>
+          <LoadingState />
         ) : premiumBlocked ? (
           <View style={{ gap: 16 }}>
             <EmptyNote

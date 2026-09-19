@@ -1,16 +1,16 @@
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, View } from 'react-native';
+import { View } from 'react-native';
 
 import { EmptyNote } from '@/components/ui/empty-note';
 import { HeroBanner } from '@/components/ui/hero-banner';
+import { LoadingState } from '@/components/ui/brand-logo';
 import { MenuRow, MenuStack } from '@/components/ui/menu-row';
 import { PageHeader } from '@/components/ui/page-header';
 import { PrimaryButton } from '@/components/ui/primary-button';
 import { Screen, ScreenScroll } from '@/components/ui/screen';
 import type { IonName } from '@/constants/brand';
 import { useAuth } from '@/contexts/auth-context';
-import { useTheme } from '@/contexts/theme-context';
 import { getCourse } from '@/lib/catalog';
 import { handlePremiumError, promptPremium } from '@/lib/premium';
 import { listCourseGroups, type NamedItem } from '@/lib/study';
@@ -26,7 +26,6 @@ type Props = {
 };
 
 export function CourseHubScreen({ slug, title, eyebrow, heroTitle, heroSubtitle, icon, gradient }: Props) {
-  const { colors } = useTheme();
   const { hasActiveSubscription } = useAuth();
   const [loading, setLoading] = useState(true);
   const [groups, setGroups] = useState<NamedItem[]>([]);
@@ -66,9 +65,7 @@ export function CourseHubScreen({ slug, title, eyebrow, heroTitle, heroSubtitle,
       <ScreenScroll>
         <HeroBanner icon={icon} eyebrow={eyebrow} title={courseTitle} subtitle={heroSubtitle} gradient={gradient} />
         {loading ? (
-          <View style={{ paddingVertical: 24 }}>
-            <ActivityIndicator color={colors.tint} />
-          </View>
+          <LoadingState />
         ) : premiumBlocked ? (
           <View style={{ gap: 16 }}>
             <EmptyNote

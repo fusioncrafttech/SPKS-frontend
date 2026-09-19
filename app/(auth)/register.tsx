@@ -86,8 +86,8 @@ export default function RegisterScreen() {
         <KeyboardAvoidingView behavior="padding" style={styles.keyboardView} keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}>
           <ScreenScroll keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" bounces={false} contentStyle={styles.scroll}>
             <HeroBanner
-              icon="person-add"
-              eyebrow="SPKS"
+              showLogo
+              eyebrow="SPKS Exam Academy"
               title="Create account"
               subtitle="Start preparing for TNPSC, RRB and TNUSRB"
               gradient={Brand.indigo}

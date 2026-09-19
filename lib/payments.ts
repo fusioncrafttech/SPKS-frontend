@@ -1,3 +1,4 @@
+import { APP_NAME } from '@/constants/brand';
 import { api, asList } from './api';
 
 export type PlanRecord = {
@@ -144,7 +145,7 @@ export async function createPaymentOrder(planId: string): Promise<CheckoutOrder>
     orderId: firstString(data, ['orderId', 'razorpayOrderId']) || firstString(order, ['orderId', 'razorpayOrderId', 'id']),
     amount: Number(data.amount ?? order.amount ?? 0),
     currency: firstString(data, ['currency'], firstString(order, ['currency'], 'INR')),
-    name: firstString(data, ['name'], firstString(plan, ['name'], 'SPKS Exams')),
+    name: firstString(data, ['name'], firstString(plan, ['name'], APP_NAME)),
     description: firstString(data, ['description'], firstString(plan, ['name', 'description'])),
   };
 }

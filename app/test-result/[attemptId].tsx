@@ -1,9 +1,10 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { AppCard } from '@/components/ui/app-card';
+import { LoadingState } from '@/components/ui/brand-logo';
 import { PageHeader } from '@/components/ui/page-header';
 import { PrimaryButton } from '@/components/ui/primary-button';
 import { Screen, ScreenScroll } from '@/components/ui/screen';
@@ -28,9 +29,7 @@ export default function TestResultScreen() {
     return (
       <Screen>
         <PageHeader title="Result" />
-        <View style={styles.center}>
-          <ActivityIndicator color={colors.tint} />
-        </View>
+        <LoadingState fill />
       </Screen>
     );
   }

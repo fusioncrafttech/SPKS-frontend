@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, StyleSheet, View } from 'react-native';
+import { Alert, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { AppCard } from '@/components/ui/app-card';
+import { LoadingState } from '@/components/ui/brand-logo';
 import { MenuRow, MenuStack } from '@/components/ui/menu-row';
 import { PageHeader } from '@/components/ui/page-header';
 import { Screen, ScreenScroll } from '@/components/ui/screen';
@@ -26,9 +27,7 @@ export default function PaymentHistoryScreen() {
       <PageHeader title="Payment history" />
       <ScreenScroll>
         {loading ? (
-          <View style={styles.center}>
-            <ActivityIndicator color={colors.tint} />
-          </View>
+          <LoadingState />
         ) : items.length ? (
           <MenuStack>
             {items.map((item, index) => (

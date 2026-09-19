@@ -4,11 +4,13 @@ import { ReactNode } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
+import { BrandLogo } from '@/components/ui/brand-logo';
 import type { IonName } from '@/constants/brand';
 import { Brand } from '@/constants/brand';
 
 type HeroBannerProps = {
   icon?: IonName;
+  showLogo?: boolean;
   eyebrow?: string;
   title: string;
   subtitle?: string;
@@ -18,6 +20,7 @@ type HeroBannerProps = {
 
 export function HeroBanner({
   icon,
+  showLogo,
   eyebrow,
   title,
   subtitle,
@@ -27,7 +30,11 @@ export function HeroBanner({
   return (
     <LinearGradient colors={gradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.card}>
       <View style={styles.glow} />
-      {icon ? (
+      {showLogo ? (
+        <View style={styles.logoWrap}>
+          <BrandLogo width={196} />
+        </View>
+      ) : icon ? (
         <View style={styles.iconWrap}>
           <Ionicons name={icon} size={22} color="#FFFFFF" />
         </View>
@@ -63,6 +70,14 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.18)',
     alignItems: 'center',
     justifyContent: 'center',
+    marginBottom: 14,
+  },
+  logoWrap: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#F8FAFF',
+    borderRadius: 18,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
     marginBottom: 14,
   },
   eyebrow: {
